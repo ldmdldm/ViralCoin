@@ -1,9 +1,9 @@
 # ViralCoin: AI-Powered Trend Token Factory
 
 ## Overview
-ViralCoin is an intelligent platform that monitors cultural, news, and social media trends across multiple platforms, then autonomously creates, launches, and markets tokenized derivatives of those trends with strategic tokenomics and built-in lifecycle management.
+ViralCoin is an intelligent platform that monitors cultural, news and social media trends across multiple platforms, then autonomously creates, launches and markets tokenized derivatives of those trends with strategic tokenomics and lifecycle management.
 
-Unlike traditional memecoin factories, ViralCoin can generate various types of tokens based on current trends - memecoins are just one option among many. Our platform uses advanced AI algorithms to analyze trends and create optimized token configurations for maximum market impact.
+ViralCoin can generate various types of tokens based on current trends and memecoins are just one option among many. Our platform uses advanced AI algorithms to analyze trends and create optimized token configurations for maximum market impact.
 
 ## Key Components
 
