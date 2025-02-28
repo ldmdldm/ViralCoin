@@ -1,0 +1,461 @@
+/* ViralCoin - Main Stylesheet
+* A modern, clean interface for cryptocurrency/memecoin project
+*/
+
+/* ===== Variables ===== */
+:root {
+/* Main color palette */
+--primary: #6c63ff;       /* Vibrant purple for primary actions */
+--primary-light: #9d97ff;
+--primary-dark: #4c46b6;
+--secondary: #ff9f43;     /* Orange for highlights and CTAs */
+--dark: #2d3436;          /* Dark slate for backgrounds */
+--light: #f7f7ff;         /* Off-white for text on dark backgrounds */
+--success: #00b894;       /* Green for success messages */
+--danger: #ff6b6b;        /* Red for errors and warnings */
+--info: #54a0ff;          /* Blue for info messages */
+--gray-100: #f8f9fa;
+--gray-200: #e9ecef;
+--gray-300: #dee2e6;
+--gray-400: #ced4da;
+--gray-500: #adb5bd;
+--gray-600: #6c757d;
+--gray-700: #495057;
+--gray-800: #343a40;
+--gray-900: #212529;
+
+/* Typography */
+--font-main: 'Poppins', sans-serif;
+--font-heading: 'Montserrat', sans-serif;
+
+/* Spacing */
+--spacing-xs: 0.25rem;
+--spacing-sm: 0.5rem;
+--spacing-md: 1rem;
+--spacing-lg: 1.5rem;
+--spacing-xl: 3rem;
+
+/* Shadows */
+--shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+--shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
+--shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
+
+/* Border Radius */
+--radius-sm: 4px;
+--radius-md: 8px;
+--radius-lg: 16px;
+--radius-xl: 24px;
+--radius-pill: 50rem;
+
+/* Transitions */
+--transition-fast: 0.15s ease-in-out;
+--transition-normal: 0.3s ease-in-out;
+--transition-slow: 0.5s ease-in-out;
+}
+
+/* ===== Base Styles ===== */
+body {
+font-family: var(--font-main);
+color: var(--gray-800);
+background-color: var(--gray-100);
+line-height: 1.6;
+overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+font-family: var(--font-heading);
+font-weight: 700;
+margin-bottom: var(--spacing-md);
+color: var(--dark);
+}
+
+p {
+margin-bottom: var(--spacing-md);
+}
+
+a {
+color: var(--primary);
+text-decoration: none;
+transition: color var(--transition-fast);
+}
+
+a:hover {
+color: var(--primary-dark);
+text-decoration: none;
+}
+
+/* ===== Layout & Container ===== */
+.container {
+padding: var(--spacing-lg) var(--spacing-md);
+}
+
+.section {
+padding: var(--spacing-xl) 0;
+}
+
+/* ===== Navigation ===== */
+.navbar {
+padding: var(--spacing-md) var(--spacing-lg);
+background-color: var(--dark);
+box-shadow: var(--shadow-md);
+}
+
+.navbar-brand {
+color: var(--light) !important;
+font-weight: 700;
+font-size: 1.5rem;
+display: flex;
+align-items: center;
+}
+
+.navbar-brand i {
+margin-right: var(--spacing-sm);
+color: var(--secondary);
+}
+
+.navbar-nav .nav-link {
+color: var(--gray-400) !important;
+font-weight: 600;
+padding: var(--spacing-sm) var(--spacing-md);
+transition: color var(--transition-fast);
+border-radius: var(--radius-sm);
+}
+
+.navbar-nav .nav-link:hover,
+.navbar-nav .nav-link.active {
+color: var(--light) !important;
+background-color: rgba(255, 255, 255, 0.05);
+}
+
+.navbar-nav .nav-link.active {
+border-bottom: 2px solid var(--secondary);
+}
+
+.navbar-toggler {
+border: none;
+color: var(--light);
+}
+
+.wallet-btn {
+background-color: var(--secondary);
+color: var(--dark);
+border-radius: var(--radius-pill);
+padding: var(--spacing-sm) var(--spacing-lg);
+font-weight: 600;
+border: none;
+transition: all var(--transition-fast);
+}
+
+.wallet-btn:hover {
+background-color: #e88a30;
+transform: translateY(-2px);
+box-shadow: var(--shadow-md);
+}
+
+.wallet-btn.connected {
+background-color: var(--success);
+}
+
+/* ===== Hero Section ===== */
+#hero {
+background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+color: var(--light);
+padding: var(--spacing-xl) 0;
+position: relative;
+overflow: hidden;
+}
+
+#hero::before {
+content: '';
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-image: url('https://cdn.pixabay.com/photo/2021/05/24/09/15/cryptocurrency-6278321_1280.png');
+background-size: cover;
+background-position: center;
+opacity: 0.1;
+z-index: 0;
+}
+
+#hero .container {
+position: relative;
+z-index: 1;
+}
+
+#hero h1 {
+font-size: 3rem;
+font-weight: 800;
+margin-bottom: var(--spacing-md);
+color: var(--light);
+text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#hero p {
+font-size: 1.25rem;
+max-width: 600px;
+margin-bottom: var(--spacing-lg);
+opacity: 0.9;
+}
+
+#hero .btn-primary {
+background-color: var(--secondary);
+border: none;
+border-radius: var(--radius-pill);
+padding: var(--spacing-md) var(--spacing-xl);
+font-weight: 600;
+font-size: 1.1rem;
+box-shadow: var(--shadow-md);
+transition: all var(--transition-normal);
+}
+
+#hero .btn-primary:hover {
+background-color: #e88a30;
+transform: translateY(-3px);
+box-shadow: var(--shadow-lg);
+}
+
+/* Floating coins animation */
+.coin {
+position: absolute;
+opacity: 0.1;
+animation: float 20s infinite linear;
+}
+
+.coin-1 {
+top: 10%;
+left: 5%;
+width: 80px;
+height: 80px;
+animation-duration: 25s;
+}
+
+.coin-2 {
+top: 30%;
+right: 10%;
+width: 60px;
+height: 60px;
+animation-duration: 18s;
+}
+
+.coin-3 {
+bottom: 20%;
+left: 20%;
+width: 70px;
+height: 70px;
+animation-duration: 22s;
+}
+
+@keyframes float {
+0% {
+    transform: translateY(0) rotate(0deg);
+}
+50% {
+    transform: translateY(-30px) rotate(180deg);
+}
+100% {
+    transform: translateY(0) rotate(360deg);
+}
+}
+
+/* ===== Trending Topics Section ===== */
+#trending {
+background-color: var(--light);
+padding: var(--spacing-xl) 0;
+}
+
+.section-header {
+text-align: center;
+margin-bottom: var(--spacing-xl);
+}
+
+.section-header h2 {
+color: var(--dark);
+position: relative;
+display: inline-block;
+margin-bottom: var(--spacing-md);
+}
+
+.section-header h2::after {
+content: '';
+position: absolute;
+bottom: -10px;
+left: 50%;
+transform: translateX(-50%);
+width: 60px;
+height: 3px;
+background-color: var(--secondary);
+}
+
+.section-header p {
+color: var(--gray-600);
+max-width: 700px;
+margin: 0 auto;
+}
+
+.trend-card {
+background-color: white;
+border-radius: var(--radius-md);
+box-shadow: var(--shadow-sm);
+transition: all var(--transition-normal);
+margin-bottom: var(--spacing-lg);
+overflow: hidden;
+border: 1px solid var(--gray-200);
+}
+
+.trend-card:hover {
+transform: translateY(-5px);
+box-shadow: var(--shadow-md);
+}
+
+.trend-card .card-body {
+padding: var(--spacing-lg);
+}
+
+.trend-card .card-title {
+font-weight: 700;
+margin-bottom: var(--spacing-sm);
+color: var(--dark);
+}
+
+.trend-card .trend-score {
+display: inline-block;
+padding: var(--spacing-xs) var(--spacing-sm);
+background-color: var(--primary-light);
+color: white;
+border-radius: var(--radius-pill);
+font-size: 0.9rem;
+font-weight: 600;
+margin-bottom: var(--spacing-md);
+}
+
+.trend-card .tag {
+display: inline-block;
+padding: var(--spacing-xs) var(--spacing-sm);
+background-color: var(--gray-200);
+color: var(--gray-700);
+border-radius: var(--radius-pill);
+font-size: 0.85rem;
+margin-right: var(--spacing-xs);
+margin-bottom: var(--spacing-xs);
+}
+
+.trend-card .deploy-btn {
+margin-top: var(--spacing-md);
+width: 100%;
+background-color: var(--primary);
+border: none;
+color: white;
+padding: var(--spacing-sm) var(--spacing-md);
+border-radius: var(--radius-md);
+font-weight: 600;
+transition: all var(--transition-fast);
+}
+
+.trend-card .deploy-btn:hover {
+background-color: var(--primary-dark);
+}
+
+/* ===== Deploy Token Section ===== */
+#deploy {
+background-color: var(--gray-100);
+padding: var(--spacing-xl) 0;
+}
+
+.form-container {
+background-color: white;
+padding: var(--spacing-lg);
+border-radius: var(--radius-md);
+box-shadow: var(--shadow-md);
+}
+
+.form-group {
+margin-bottom: var(--spacing-md);
+}
+
+.form-label {
+font-weight: 600;
+color: var(--gray-700);
+margin-bottom: var(--spacing-xs);
+}
+
+.form-control {
+border-radius: var(--radius-sm);
+border: 1px solid var(--gray-300);
+padding: var(--spacing-sm) var(--spacing-md);
+transition: all var(--transition-fast);
+}
+
+.form-control:focus {
+border-color: var(--primary);
+box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.25);
+}
+
+.form-select {
+border-radius: var(--radius-sm);
+border: 1px solid var(--gray-300);
+padding: var(--spacing-sm) var(--spacing-md);
+transition: all var(--transition-fast);
+}
+
+.form-select:focus {
+border-color: var(--primary);
+box-shadow: 0 0 0 3px rgba(108, 99, 255, 0.25);
+}
+
+.submit-btn {
+background-color: var(--secondary);
+color: white;
+border: none;
+padding: var(--spacing-md) var(--spacing-lg);
+border-radius: var(--radius-md);
+font-weight: 600;
+font-size: 1.1rem;
+width: 100%;
+box-shadow: var(--shadow-sm);
+transition: all var(--transition-normal);
+}
+
+.submit-btn:hover {
+background-color: #e88a30;
+transform: translateY(-2px);
+box-shadow: var(--shadow-md);
+}
+
+/* Token Preview Box */
+.token-preview {
+background-color: var(--gray-100);
+border-radius: var(--radius-md);
+padding: var(--spacing-lg);
+border: 2px dashed var(--gray-400);
+height: 100%;
+}
+
+.token-preview h4 {
+color: var(--primary);
+margin-bottom: var(--spacing-md);
+}
+
+.token-preview .preview-item {
+display: flex;
+justify-content: space-between;
+padding: var(--spacing-sm) 0;
+border-bottom: 1px solid var(--gray-300);
+}
+
+.token-preview .preview-label {
+font-weight: 600;
+color: var(--gray-700);
+}
+
+.token-preview .preview-value {
+color: var(--gray-800);
+}
+
+/* ===== My Tokens Section ===== */
+#my-tokens {
+background-color: white;
+padding: var(--spacing-xl) 0;
+}
+
