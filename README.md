@@ -1,4 +1,4 @@
-# ViralCoin: AI-Powered Trend Token Factory
+# ViralCoin: AI Trend Token Factory
 
 ## Overview
 ViralCoin is an intelligent platform that monitors cultural, news and social media trends across multiple platforms, then autonomously creates, launches and markets tokenized derivatives of those trends with strategic tokenomics and lifecycle management.
