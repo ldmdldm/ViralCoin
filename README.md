@@ -1,32 +1,57 @@
-# ViralCoin
+# ViralCoin: AI-Powered Trend Monetization Platform
 
-[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![Vyper](https://img.shields.io/badge/vyper-0.3.7-green.svg)](https://vyperlang.org/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![OpenAI](https://img.shields.io/badge/AI-OpenAI-orange.svg)](https://openai.com/)
 [![Polygon](https://img.shields.io/badge/blockchain-Polygon-purple.svg)](https://polygon.technology/)
 
-## 🚀 AI-Powered Trend Monetization Platform
+## Overview
+ViralCoin is an intelligent platform that monitors cultural, news and social media trends across multiple platforms, then autonomously creates, launches and markets tokenized derivatives of those trends with strategic tokenomics and lifecycle management.
 
-ViralCoin is an innovative platform that leverages artificial intelligence to monitor trends across social media, news outlets, and entertainment platforms, automatically creating tokenized derivatives of viral content. By bridging the gap between trending topics and blockchain technology, ViralCoin enables users to invest in cultural phenomena as they emerge.
+By bridging the gap between trending topics and blockchain technology, ViralCoin enables users to invest in cultural phenomena as they emerge.
 
 ![ViralCoin Logo](https://via.placeholder.com/800x200?text=ViralCoin)
 
-## 📋 Table of Contents
+## Key Components
 
-- [Features](#-features)
-- [Prerequisites](#-prerequisites)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [API Documentation](#-api-documentation)
-- [Architecture](#-architecture)
-- [Hackathon Context](#-hackathon-context)
-- [Roadmap](#-roadmap)
-- [License](#-license)
-- [Contributing](#-contributing)
-- [Contact](#-contact)
+### 1. Multi-Source Trend Analysis Engine
+- Smart contracts ingest trend data from oracles that monitor Twitter, Reddit, news APIs, and Google Trends
+- AI classifies trends by sustainability, emotional resonance, and memetic potential
+- Categorization system ranks trends by "tokenization potential" using a proprietary scoring algorithm
+- Supports various trend categories including crypto, meme, tech, finance, and entertainment
 
-## 🚀 Features
+### 2. Dynamic Tokenomics Generator
+- AI analyzes successful token designs and creates custom tokenomics for each trend
+- Parameters include supply curves, tax structures, liquidity allocations
+- Token mechanics are tailored to the specific trend category
+- Each generated token has optimized parameters for its trend category
+
+### 3. Auto-Marketing Smart Contract Suite
+- Contracts automatically allocate marketing funds based on trend momentum
+- Integrates with social platforms through oracles to measure engagement
+- Uses game theory to optimize timing of liquidity events and marketing pushes
+
+### 4. Sentiment-Responsive Liquidity Management
+- Monitors sentiment around the token and adjusts liquidity accordingly
+- Implements buyback and burn mechanisms when sentiment dips below thresholds
+- Maximizes token longevity and stability
+
+## Table of Contents
+
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Usage](#usage)
+- [API Documentation](#api-documentation)
+- [Architecture](#architecture)
+- [Hackathon Context](#hackathon-context)
+- [Roadmap](#roadmap)
+- [License](#license)
+- [Contributing](#contributing)
+- [Contact](#contact)
+
+## Features
 
 - **Real-time Trend Analysis**: Advanced AI algorithms constantly scan multiple platforms to identify emerging trends with potential for tokenization
 - **Automated Token Generation**: Creates ERC-20 compatible tokens with Vyper smart contracts based on trend characteristics
@@ -35,15 +60,16 @@ ViralCoin is an innovative platform that leverages artificial intelligence to mo
 - **Viral Prediction Engine**: Estimates potential trend longevity and virality to optimize token parameters
 - **Cross-platform Integration**: Monitors Twitter, Reddit, TikTok, and other major content platforms
 
-## 📋 Prerequisites
+## Prerequisites
 
-- Python 3.9+
-- Node.js 16+
+- Python 3.8+
+- Node.js 14+
 - OpenAI API key
 - Ethereum/Polygon wallet with testnet tokens for deployment
-- Familiarity with Python (Vyper experience is helpful but not required)
+- Vyper 0.3.7+
+- Web3.py
 
-## 🔧 Installation
+## Installation
 
 ### Clone and Set Up
 
@@ -58,20 +84,10 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install Python dependencies
 pip install -r requirements.txt
-
-# Install Node.js dependencies for the frontend
-cd frontend
-npm install
-cd ..
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your API keys and configuration
 ```
 
 ### Configuration
-
-Edit your `.env` file with the following information:
+Create a `.env` file in the root directory with the following:
 
 ```
 # API Keys
@@ -82,9 +98,6 @@ RPC_URL=your_blockchain_rpc_url
 PRIVATE_KEY=your_wallet_private_key
 FACTORY_ADDRESS=your_factory_contract_address
 
-# Database Configuration
-DATABASE_URL=your_database_url
-
 # Optional: Social Media APIs for enhanced trend analysis
 TWITTER_API_KEY=your_twitter_api_key
 TWITTER_API_SECRET=your_twitter_api_secret
@@ -92,50 +105,48 @@ REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_CLIENT_SECRET=your_reddit_client_secret
 ```
 
-## 🖥️ Usage
+## Usage
+
+### Analyzing Trends
+```python
+from ai.trend_analyzer import TrendAnalyzer
+
+# Initialize with API keys
+analyzer = TrendAnalyzer({
+    'twitter': 'your_twitter_api_key',
+    'reddit': 'your_reddit_api_key',
+    'news': 'your_news_api_key'
+})
+
+# Get current trends
+trends = analyzer.analyze_trends()
+print(f"Top trends: {trends['top_trends']}")
+
+# Generate token configuration for a specific trend
+config = analyzer.suggest_token_configuration('defi')
+print(f"Token configuration: {config}")
+```
+
+### Deploying a Token
+```bash
+# Deploy a token based on the current top trend
+python scripts/deploy_trending_token.py
+
+# Deploy a token based on a specific trend
+python scripts/deploy_token.py --trend "nft"
+```
 
 ### Starting the Trend Analysis Engine
-
 ```bash
 python trend_analyzer.py
 ```
 
 ### Running the API Server
-
 ```bash
 python api/index.py
 ```
 
-### Deploying a Token for the Current Top Trend
-
-```bash
-python scripts/deploy_trending_token.py
-```
-
-### Using the Web Dashboard
-
-```bash
-cd frontend
-npm start
-```
-Then visit `http://localhost:3000` in your browser.
-
-### Command Line Interface
-
-ViralCoin also provides a command-line interface for quick interactions:
-
-```bash
-# Get current trending topics
-python cli.py trends
-
-# Generate a token for a specific trend
-python cli.py generate --trend "trending_topic_name"
-
-# Deploy a specific token to the blockchain
-python cli.py deploy --token-id "token_id"
-```
-
-## 📚 API Documentation
+## API Documentation
 
 ViralCoin exposes a RESTful API for programmatic interaction with the platform:
 
@@ -166,18 +177,9 @@ Authorization: Bearer YOUR_API_KEY
 | `/api/tokens/:id` | GET | Get details of a specific token |
 | `/api/tokens/:id/deploy` | POST | Deploy a token to the blockchain |
 
-#### Analytics
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/analytics/performance` | GET | Get performance metrics for deployed tokens |
-| `/api/analytics/predict` | POST | Predict potential performance of a trend |
-
-## 🏗️ Architecture
+## Architecture
 
 ViralCoin consists of several integrated components:
-
-![Architecture Diagram](https://via.placeholder.com/800x400?text=ViralCoin+Architecture)
 
 1. **Trend Analysis Engine** - Uses NLP and sentiment analysis to identify and rank trends
     - Leverages OpenAI's GPT models for content analysis
@@ -195,16 +197,23 @@ ViralCoin consists of several integrated components:
     - Provides detailed documentation via Swagger UI
 
 4. **Smart Contracts** - Vyper-based ERC-20 compatible tokens with specialized parameters
-    - Utilizes Snekmate modules for secure contract implementation
     - Implements custom liquidity pool integration
     - Features automated market making for new tokens
 
-5. **Frontend Dashboard** - Web interface for monitoring trends and managing tokens
-    - Built with React for responsive UI
-    - Real-time updates via WebSockets
-    - Comprehensive analytics visualizations
+## Project Structure
+```
+viralcoin/
+├── ai/                   # AI models and trend analysis
+│   └── trend_analyzer.py # Trend analysis engine
+├── contracts/            # Vyper smart contracts
+│   ├── TokenFactory.vy   # Factory contract for deploying tokens
+│   └── TrendToken.vy     # Base token implementation
+├── scripts/              # Deployment and interaction scripts
+├── tests/                # Test suite
+└── README.md             # This file
+```
 
-## 🏆 Hackathon Context
+## Hackathon Context
 
 ViralCoin is being developed for a hackathon exploring the intersection of Vyper, AI agents, and blockchain technology, in collaboration with Polygon & Tesseract. The hackathon focuses on creating AI-powered smart contracts, with our project being an autonomous memecoin factory that analyzes trends and deploys tokens automatically using Vyper smart contracts.
 
@@ -221,46 +230,22 @@ Total Prize Pool: $1,000 USDC
 - 🥈 Second Place: $300
 - 🥉 Third Place: $200
 
-### Judging Criteria
-Projects will be judged based on:
-- Technical Innovation (30%)
-- AI Integration (25%)
-- Code Quality & Security (25%)
-- Business Potential (20%)
-
-## 📈 Roadmap
+## Roadmap
 
 - **Q1 2025**: Initial release with basic trend analysis and token generation
 - **Q2 2025**: Enhanced AI predictions and expanded data sources
 - **Q3 2025**: Mobile app development and widget integration
 - **Q4 2025**: Decentralized governance implementation and DAO structure
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👍 Contributing
+## Contributing
 
-Contributions are welcome! Here's how you can contribute:
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-1. **Fork the repository**
-2. **Create a feature branch**:
-```bash
-git checkout -b feature/amazing-feature
-```
-3. **Commit your changes**:
-```bash
-git commit -m 'Add some amazing feature'
-```
-4. **Push to the branch**:
-```bash
-git push origin feature/amazing-feature
-```
-5. **Open a Pull Request**
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidance on our code of conduct and submission process.
-
-## 📧 Contact
+## Contact
 
 Project Link: [https://github.com/yourusername/ViralCoin](https://github.com/yourusername/ViralCoin)
 
