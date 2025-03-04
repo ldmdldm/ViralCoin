@@ -367,5 +367,10 @@ def includeInMaxTx(_address: address):
         # Extract first letters of each word, up to 5 characters
         words = name.split()
         if len(words) == 1:
-            
-
+            # If it's a single word, take up to 5 letters
+            symbol = words[0][:5].upper()
+        else:
+            # If it's multiple words, take the first letter of each word
+            symbol = ''.join(word[0] for word in words).upper()
+        
+        return symbol
