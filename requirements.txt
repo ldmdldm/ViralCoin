@@ -9,7 +9,7 @@ Werkzeug==2.3.7
 openai>=1.6.1,<2.0.0
 langchain>=0.1.0
 langchain-openai==0.0.2.post1
-tiktoken==0.5.1
+tiktoken>=0.5.2,<0.6.0
 
 # Blockchain
 web3==6.0.0
