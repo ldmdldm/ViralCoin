@@ -39,7 +39,7 @@ app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
 # Initialize TrendAnalyzer and TokenGenerator
-trend_analyzer = TrendAnalyzer(api_key=os.getenv("OPENAI_API_KEY"))
+trend_analyzer = TrendAnalyzer()
 token_generator = TokenGenerator()
 
 # Store generated tokens in memory (in a production environment, use a database)
