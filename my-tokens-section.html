@@ -1,0 +1,68 @@
+<!-- My Tokens Section -->
+<section class="container-fluid py-5" id="tokens">
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-lg-6">
+                <h2 class="fw-bold mb-3">My <span class="gradient-text">Tokens</span></h2>
+                <p class="lead text-muted">View and manage your deployed viral tokens</p>
+            </div>
+            <div class="col-lg-6 text-end">
+                <button id="refreshTokensBtn" class="btn btn-primary">
+                    <i class="fas fa-sync-alt me-2"></i>Refresh Tokens
+                </button>
+            </div>
+        </div>
+        
+        <div id="deployedTokensContainer" class="row g-4">
+            <!-- Token cards will be populated here by JavaScript -->
+            
+            <!-- Placeholder for empty state -->
+            <div class="col-12 text-center py-5 empty-state">
+                <i class="fas fa-coins fa-4x mb-3 text-muted"></i>
+                <h4>No tokens deployed yet</h4>
+                <p>Generate and deploy your first viral token to see it here</p>
+            </div>
+            
+            <!-- Sample token card (will be hidden/replaced by JavaScript) -->
+            <div class="col-lg-4 col-md-6 sample-token d-none">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-header bg-gradient-primary text-white">
+                        <h5 class="token-name mb-0">DogeToken</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="badge bg-info token-symbol">DOGE</span>
+                            <span class="badge bg-success token-status">Deployed</span>
+                        </div>
+                        <ul class="list-group list-group-flush mb-3">
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Supply:</span>
+                                <span class="token-supply">1,000,000</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Category:</span>
+                                <span class="token-category">Meme</span>
+                            </li>
+                            <li class="list-group-item d-flex justify-content-between">
+                                <span>Blueprint:</span>
+                                <span class="token-blueprint">Standard</span>
+                            </li>
+                        </ul>
+                        <div class="d-flex justify-content-between">
+                            <a href="#" class="btn btn-sm btn-outline-primary token-address-link">
+                                <i class="fas fa-external-link-alt me-1"></i>View on Explorer
+                            </a>
+                            <button class="btn btn-sm btn-outline-secondary copy-address-btn">
+                                <i class="fas fa-copy me-1"></i>Copy Address
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        <small class="text-muted">Deployed on <span class="token-date">Jun 15, 2023</span></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+

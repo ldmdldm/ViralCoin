@@ -38,19 +38,33 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-# Serve the frontend index.html at the root path
+# Serve the index.html from the root directory at the root path
 @app.route('/')
 def index():
-    """Serve the frontend index.html file."""
+    """Serve the new-index.html file from the root directory."""
     from flask import send_from_directory
-    return send_from_directory('frontend', 'index.html')
+    import os
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'new-index.html')
 
 @app.route('/<path:path>')
 def serve_static(path):
-    """Serve static files from the frontend directory.
+    """Serve static files from the root directory first, then frontend directory.
     
     This route handles requests for CSS, JavaScript, images, and other static assets.
+    It first checks if the file exists in the root directory, and if not, falls back
+    to checking the frontend directory.
     """
+    from flask import send_from_directory
+    import os
+    
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    root_file_path = os.path.join(root_dir, path)
+    
+    # First check if file exists in root directory
+    if os.path.isfile(root_file_path):
+        return send_from_directory(root_dir, path)
+    
+    # Fall back to frontend directory
     return send_from_directory('frontend', path)
 
 # Initialize TrendAnalyzer and TokenGenerator

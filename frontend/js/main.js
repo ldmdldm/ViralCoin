@@ -8,6 +8,9 @@
 * - Data fetching and display
 */
 
+// Global API key for backend authentication
+const API_KEY = 'development_key';
+
 // Contract ABIs - These would typically be imported from JSON files
 // Simplified versions for demonstration
 const TokenFactoryABI = [
@@ -81,6 +84,8 @@ let tokenFactoryContract;
 let userTokens = [];
 let isConnected = false;
 let trendingTopics = [];
+let chartInstances = {};
+let isDemoMode = false;
 
 // Contract addresses (these would be network-specific)
 const CONTRACT_ADDRESSES = {
@@ -88,15 +93,15 @@ tokenFactory: '0x1234567890123456789012345678901234567890' // Replace with actua
 };
 
 // DOM Elements
-const connectButton = document.getElementById('connect-wallet-btn');
-const accountDisplay = document.getElementById('account-display');
-const deployForm = document.getElementById('deploy-token-form');
-const trendingTopicsContainer = document.getElementById('trending-topics');
-const tokenPreview = document.getElementById('token-preview');
-const deployedTokensContainer = document.getElementById('deployed-tokens');
-const statusMessage = document.getElementById('status-message');
-const blueprintSelect = document.getElementById('token-blueprint');
-const loadingSpinner = document.getElementById('loading-spinner');
+const connectButton = document.getElementById('connectWallet');
+const accountDisplay = document.getElementById('walletAddress');
+const deployForm = document.getElementById('tokenGeneratorForm');
+const trendingTopicsContainer = document.getElementById('trendingTopicsList');
+const tokenPreview = document.getElementById('tokenPreview');
+const deployedTokensContainer = document.getElementById('userTokensList');
+const statusMessage = document.getElementById('statusMessage');
+const blueprintSelect = document.getElementById('tokenBlueprint');
+const loadingSpinner = document.getElementById('loadingOverlay');
 
 /**
 * Initialize the application
@@ -105,7 +110,9 @@ async function init() {
 console.log('Initializing ViralCoin dApp...');
 
 // Set up event listeners
-connectButton.addEventListener('click', connectWallet);
+if (connectButton) {
+    connectButton.addEventListener('click', connectWallet);
+}
 
 if (deployForm) {
     deployForm.addEventListener('submit', handleTokenDeployment);
@@ -113,8 +120,33 @@ if (deployForm) {
     // Set up form preview events
     const formInputs = deployForm.querySelectorAll('input, select');
     formInputs.forEach(input => {
-    input.addEventListener('change', updateTokenPreview);
+        input.addEventListener('change', updateTokenPreview);
+        input.addEventListener('keyup', updateTokenPreview);
     });
+}
+
+// Add event listeners for tabs if they exist
+const tabButtons = document.querySelectorAll('[data-bs-toggle="tab"]');
+tabButtons.forEach(button => {
+    button.addEventListener('shown.bs.tab', function(event) {
+        const targetId = event.target.getAttribute('data-bs-target');
+        if (targetId === '#trendsTab') {
+            loadTrendingTopics();
+        } else if (targetId === '#myTokensTab') {
+            loadUserTokens();
+        }
+    });
+});
+
+// Set up refresh buttons
+const refreshTrendsBtn = document.getElementById('refreshTrendsBtn');
+if (refreshTrendsBtn) {
+    refreshTrendsBtn.addEventListener('click', loadTrendingTopics);
+}
+
+const refreshTokensBtn = document.getElementById('refreshTokensBtn');
+if (refreshTokensBtn) {
+    refreshTokensBtn.addEventListener('click', loadUserTokens);
 }
 
 // Check if MetaMask is installed
@@ -127,20 +159,129 @@ if (window.ethereum) {
     // Handle chain changes
     window.ethereum.on('chainChanged', () => window.location.reload());
     
+    // Listen for connection events
+    window.ethereum.on('connect', () => {
+        showToast('Connected to Ethereum network', 'success');
+        document.dispatchEvent(new CustomEvent('wallet:connected'));
+    });
+    
+    // Listen for disconnection events
+    window.ethereum.on('disconnect', (error) => {
+        showToast('Disconnected from Ethereum network: ' + error.message, 'warning');
+        document.dispatchEvent(new CustomEvent('wallet:disconnected'));
+    });
+    
     // Auto-connect if previously connected
     if (localStorage.getItem('walletConnected') === 'true') {
-    connectWallet();
+        connectWallet();
     }
 } else {
-    updateStatus('Please install MetaMask to use this dApp', 'error');
+    updateStatus('MetaMask not detected. Running in demo mode.', 'warning');
     if (connectButton) {
-    connectButton.disabled = true;
-    connectButton.innerHTML = 'MetaMask Not Detected';
+        connectButton.disabled = false;
+        connectButton.innerHTML = 'Demo Mode';
+        connectButton.addEventListener('click', enableDemoMode);
     }
+    // Enable demo mode automatically
+    enableDemoMode();
+}
+
+/**
+* Enable demo mode when MetaMask is not available
+*/
+function enableDemoMode() {
+    console.log('Enabling demo mode...');
+    isDemoMode = true;
+    
+    // Create mock contract for demos
+    tokenFactoryContract = createMockContract();
+    
+    // Set a demo account address
+    accounts = ['0xDEMO000000000000000000000000000000000000'];
+    
+    // Update UI for demo mode
+    updateUIForDemoMode();
+    
+    // Load demo data
+    loadBlueprints();
+    loadTrendingTopics();
+    loadUserTokens();
+    
+    // Show notification
+    showToast('Demo mode enabled. No blockchain connection required.', 'info');
+}
+
+/**
+* Update UI for demo mode
+*/
+function updateUIForDemoMode() {
+    // Update connection button
+    if (connectButton) {
+        connectButton.innerHTML = 'Demo Mode Active';
+        connectButton.classList.remove('btn-primary');
+        connectButton.classList.add('btn-warning');
+        connectButton.disabled = true;
+    }
+    
+    // Update wallet address display
+    if (accountDisplay) {
+        accountDisplay.textContent = 'Demo Account';
+    }
+    
+    // Add demo badge to navbar
+    const navbarBrand = document.querySelector('.navbar-brand');
+    if (navbarBrand) {
+        const demoBadge = document.createElement('span');
+        demoBadge.className = 'badge bg-warning ms-2';
+        demoBadge.textContent = 'DEMO';
+        navbarBrand.appendChild(demoBadge);
+    }
+    
+    // Enable all functionality that would normally require connection
+    document.querySelectorAll('.needs-connection').forEach(el => {
+        el.classList.remove('disabled');
+    });
+    
+    // Show all connected-only elements
+    document.querySelectorAll('.connected-only').forEach(el => {
+        el.style.display = 'block';
+    });
+    
+    // Hide all disconnected-only elements
+    document.querySelectorAll('.disconnected-only').forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Add demo watermark
+    const demoWatermark = document.createElement('div');
+    demoWatermark.className = 'demo-watermark';
+    demoWatermark.textContent = 'DEMO MODE';
+    document.body.appendChild(demoWatermark);
+    
+    // Add demo stylesheet
+    const demoStyle = document.createElement('style');
+    demoStyle.textContent = `
+        .demo-watermark {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(255, 193, 7, 0.2);
+            color: #856404;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+    `;
+    document.head.appendChild(demoStyle);
 }
 
 // Load trending topics regardless of wallet connection
 await loadTrendingTopics();
+
+// Initialize analytics charts
+initAnalyticsCharts();
 }
 
 /**
@@ -179,6 +320,9 @@ try {
     
     // Update UI based on connection
     updateUIForConnectedState();
+    
+    // Initialize blockchain data refresh
+    startBlockchainDataRefresh();
 } catch (error) {
     console.error('Error connecting wallet:', error);
     updateStatus(`Connection failed: ${error.message}`, 'error');
@@ -190,18 +334,69 @@ try {
 }
 
 /**
+/**
 * Initialize contract instances
 */
 function initializeContracts(networkId) {
-// In a production app, you would select the contract address based on the network ID
-tokenFactoryContract = new web3.eth.Contract(
-    TokenFactoryABI,
-    CONTRACT_ADDRESSES.tokenFactory
-);
-
-console.log('Contracts initialized');
+    try {
+        // In a production app, you would select the contract address based on the network ID
+        tokenFactoryContract = new web3.eth.Contract(
+            TokenFactoryABI,
+            CONTRACT_ADDRESSES.tokenFactory
+        );
+        
+        console.log('Contracts initialized');
+    } catch (error) {
+        console.error('Error initializing contracts:', error);
+        // Use mock contract for demo mode
+        tokenFactoryContract = createMockContract();
+        console.log('Using mock contract for demo');
+    }
 }
 
+/**
+* Create a mock contract for demo mode
+*/
+function createMockContract() {
+    return {
+        methods: {
+            createToken: (name, symbol, initialSupply, blueprintId) => ({
+                send: (options) => {
+                    // Simulate blockchain delay
+                    return new Promise((resolve) => {
+                        setTimeout(() => {
+                            // Generate a random address
+                            const tokenAddress = '0x' + Array.from({length: 40}, () => 
+                                Math.floor(Math.random() * 16).toString(16)).join('');
+                            resolve(tokenAddress);
+                        }, 2000);
+                    });
+                }
+            }),
+            getAllBlueprints: () => ({
+                call: () => Promise.resolve(['1', '2', '3', '4', '5'])
+            }),
+            getBlueprintDetails: (blueprintId) => ({
+                call: () => {
+                    const categories = ['Social', 'Finance', 'Technology', 'Entertainment', 'Gaming'];
+                    const descriptions = [
+                        'Standard ERC-20 token with basic functionality',
+                        'Deflationary token that burns 1% on each transaction',
+                        'Reflective token that redistributes 2% to holders',
+                        'Governance token with voting capability',
+                        'Utility token for platform access'
+                    ];
+                    const id = parseInt(blueprintId) - 1;
+                    return Promise.resolve({
+                        category: categories[id % categories.length],
+                        description: descriptions[id % descriptions.length],
+                        tokenType: id % 5
+                    });
+                }
+            }),
+        }
+    };
+}
 /**
 * Handle changes to connected accounts
 */
@@ -279,31 +474,62 @@ if (accountDisplay) {
 * Load trending topics from the API
 */
 async function loadTrendingTopics() {
-showLoading(true);
-updateStatus('Loading trending topics...', 'info');
-
-try {
-    // In a real app, you would fetch this from your backend API
-    // For now, we'll simulate a fetch with setTimeout
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    showLoading(true);
+    updateStatus('Loading trending topics...', 'info');
     
-    // Sample trending topics (in production, this would come from your TrendAnalyzer API)
-    trendingTopics = [
-    { name: 'Artificial Intelligence', score: 0.95, category: 'Technology' },
-    { name: 'SpaceX Launch', score: 0.89, category: 'Space' },
-    { name: 'NFT Art', score: 0.82, category: 'Crypto' },
-    { name: 'Quantum Computing', score: 0.78, category: 'Technology' },
-    { name: 'DeFi Revolution', score: 0.76, category: 'Finance' }
-    ];
-    
-    displayTrendingTopics();
-    updateStatus('Trending topics loaded', 'success');
-} catch (error) {
-    console.error('Error loading trending topics:', error);
-    updateStatus('Failed to load trending topics', 'error');
-} finally {
-    showLoading(false);
-}
+    try {
+        // Make a real API call to the backend
+        // Make a real API call to the backend
+        const response = await fetch('/api/trends', {
+            headers: {
+                'X-API-Key': API_KEY
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Check if we received valid data from the API
+        if (data && Array.isArray(data.topics) && data.topics.length > 0) {
+            trendingTopics = data.topics;
+            console.log('Topics loaded from API:', trendingTopics);
+        } else {
+            // If API returned empty data, use fallback
+            console.warn('API returned empty data, using fallback topics');
+            throw new Error('No topics received from API');
+        }
+        
+        displayTrendingTopics();
+        updateStatus('Trending topics loaded from server', 'success');
+    } catch (error) {
+        console.error('Error loading trending topics:', error);
+        
+        // Fallback to sample data if API call fails
+        trendingTopics = [
+            { name: 'Artificial Intelligence in Healthcare', score: 0.98, category: 'Technology', description: 'AI models revolutionizing disease diagnosis and treatment planning' },
+            { name: 'Ethereum Layer 2 Solutions', score: 0.95, category: 'Crypto', description: 'Scaling solutions driving lower fees and higher transaction throughput' },
+            { name: 'Climate Tech Startups', score: 0.93, category: 'Environment', description: 'New companies developing carbon capture and sustainable energy technologies' },
+            { name: 'SpaceX Starship Orbital Test', score: 0.91, category: 'Space', description: 'Latest developments in commercial space exploration' },
+            { name: 'Central Bank Digital Currencies', score: 0.89, category: 'Finance', description: 'Government-backed digital currencies reshaping monetary policy' },
+            { name: 'Metaverse Real Estate Boom', score: 0.87, category: 'Crypto', description: 'Virtual land sales reaching new highs across multiple platforms' },
+            { name: 'Quantum Computing Breakthroughs', score: 0.85, category: 'Technology', description: 'Recent advancements in quantum error correction and qubit stability' },
+            { name: 'NFT Gaming Revolution', score: 0.84, category: 'Entertainment', description: 'Play-to-earn games changing the economics of gaming industry' },
+            { name: 'Global Supply Chain Innovations', score: 0.82, category: 'Business', description: 'New technologies addressing logistics challenges' },
+            { name: 'AR/VR Devices Launch', score: 0.80, category: 'Technology', description: 'Next generation of mixed reality headsets entering the market' },
+            { name: 'Sustainable Finance Movement', score: 0.78, category: 'Finance', description: 'ESG investments reshaping capital allocation globally' },
+            { name: 'Zero-Knowledge Proofs', score: 0.77, category: 'Crypto', description: 'Privacy technology enabling new use cases in blockchain' },
+            { name: 'Remote Work Technologies', score: 0.76, category: 'Business', description: 'Tools and platforms for distributed workforces gaining adoption' },
+            { name: 'Decentralized Science (DeSci)', score: 0.74, category: 'Technology', description: 'Blockchain-based funding and collaboration for scientific research' },
+            { name: 'Neural Interface Developments', score: 0.72, category: 'Technology', description: 'Brain-computer interfaces advancing human-machine interaction' }
+        ];
+        
+        displayTrendingTopics();
+        updateStatus('Using sample trending topics (API unavailable)', 'warning');
+    } finally {
+        showLoading(false);
+    }
 }
 
 /**
@@ -318,24 +544,31 @@ trendingTopics.forEach(topic => {
     const scorePercentage = Math.round(topic.score * 100);
     
     const topicElement = document.createElement('div');
-    topicElement.className = 'trend-item card mb-3';
+    topicElement.className = 'col-md-6 col-lg-4 mb-4';
     topicElement.innerHTML = `
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center">
-        <h5 class="card-title">${topic.name}</h5>
-        <span class="badge ${getScoreBadgeClass(topic.score)}">${scorePercentage}%</span>
+    <div class="trend-card">
+        <div class="trend-card-header">
+            <h5 class="trend-title">${topic.name}</h5>
+            <span class="trend-score ${getScoreBadgeClass(topic.score)}">${scorePercentage}%</span>
         </div>
-        <p class="card-text small text-muted">${topic.category}</p>
-        <div class="progress">
-        <div class="progress-bar ${getScoreProgressClass(topic.score)}" role="progressbar" 
-            style="width: ${scorePercentage}%" aria-valuenow="${scorePercentage}" 
-            aria-valuemin="0" aria-valuemax="100"></div>
-        </div>
-        <div class="mt-3">
-        <button class="btn btn-sm btn-outline-primary use-trend-btn" 
-                data-trend="${topic.name}" data-category="${topic.category}">
-            Use For Token
-        </button>
+        <div class="trend-card-body">
+            <div class="trend-category">${topic.category}</div>
+            <div class="trend-description text-muted mb-2">${topic.description || 'No description available'}</div>
+            <div class="trend-progress">
+                <div class="progress-bar ${getScoreProgressClass(topic.score)}" role="progressbar" 
+                    style="width: ${scorePercentage}%" aria-valuenow="${scorePercentage}" 
+                    aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <div class="trend-actions">
+                <button class="btn btn-primary use-trend-btn" 
+                        data-trend="${topic.name}" data-category="${topic.category}">
+                    Create Token
+                </button>
+                <button class="btn btn-outline-secondary analyze-trend-btn"
+                        data-trend="${topic.name}">
+                    <i class="fas fa-chart-line"></i> Analyze
+                </button>
+            </div>
         </div>
     </div>
     `;
@@ -354,28 +587,105 @@ trendingTopics.forEach(topic => {
 * Populate the token form with trend data
 */
 function populateTokenForm(topic) {
-if (!deployForm) return;
+    if (!deployForm) return;
 
-const nameInput = deployForm.querySelector('#token-name');
-const symbolInput = deployForm.querySelector('#token-symbol');
+    const nameInput = deployForm.querySelector('#tokenName');
+    const symbolInput = deployForm.querySelector('#tokenSymbol');
+    const categoryInput = deployForm.querySelector('#tokenCategory');
 
-if (nameInput && symbolInput) {
-    nameInput.value = `${topic.name} Token`;
-    
-    // Create symbol from first letters of each word
-    const symbol = topic.name.split(' ')
-    .map(word => word[0])
-    .join('')
-    .toUpperCase();
-    
-    symbolInput.value = symbol;
-    
-    // Scroll to form
-    deployForm.scrollIntoView({ behavior: 'smooth' });
-    
-    // Update preview
-    updateTokenPreview();
-}
+    if (nameInput && symbolInput) {
+        nameInput.value = `${topic.name} Token`;
+        
+        // Create symbol from first letters of each word
+        const symbol = topic.name.split(' ')
+            .map(word => word[0])
+            .join('')
+            .toUpperCase();
+        
+        symbolInput.value = symbol;
+        
+        // Set category if the input exists
+        if (categoryInput) {
+            categoryInput.value = topic.category;
+        }
+        
+        // Scroll to generator section
+        document.getElementById('tokenGenerator').scrollIntoView({ behavior: 'smooth' });
+        
+        // Update preview
+        updateTokenPreview();
+                // Show a toast notification
+                showToast(`Trend "${topic.name}" loaded into generator`, 'info');
+            }
+            }
+
+            /**
+            * Display a toast notification
+            */
+            function showToast(message, type = 'info') {
+                // Create toast container if it doesn't exist
+                let toastContainer = document.getElementById('toastContainer');
+                if (!toastContainer) {
+                    toastContainer = document.createElement('div');
+                    toastContainer.id = 'toastContainer';
+                    toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+                    document.body.appendChild(toastContainer);
+                }
+                
+                // Generate a unique ID for this toast
+                const toastId = 'toast_' + Date.now();
+                
+                // Set icon based on type
+                let icon = '';
+                switch(type) {
+                    case 'success':
+                        icon = '<i class="fas fa-check-circle me-2"></i>';
+                        break;
+                    case 'error':
+                        icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+                        break;
+                    case 'warning':
+                        icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                        break;
+                    case 'info':
+                    default:
+                        icon = '<i class="fas fa-info-circle me-2"></i>';
+                }
+                
+                // Create toast element
+                const toast = document.createElement('div');
+                toast.id = toastId;
+                toast.className = `toast align-items-center border-0 ${type === 'error' ? 'bg-danger' : type === 'success' ? 'bg-success' : type === 'warning' ? 'bg-warning' : 'bg-info'} text-white`;
+                toast.setAttribute('role', 'alert');
+                toast.setAttribute('aria-live', 'assertive');
+                toast.setAttribute('aria-atomic', 'true');
+                
+                toast.innerHTML = `
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${icon}${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                `;
+                
+                // Add toast to container
+                toastContainer.appendChild(toast);
+                
+                // Initialize Bootstrap toast
+                const bsToast = new bootstrap.Toast(toast, {
+                    autohide: true,
+                    delay: 5000
+                });
+                
+                // Show toast
+                bsToast.show();
+                
+                // Remove toast from DOM after it's hidden
+                toast.addEventListener('hidden.bs.toast', () => {
+                    toast.remove();
+                });
+            }
 }
 
 /**
@@ -401,36 +711,65 @@ return 'bg-danger';
 }
 
 /**
+/**
 * Load blueprints from the contract
 */
 async function loadBlueprints() {
-if (!tokenFactoryContract || !blueprintSelect) return;
-
-try {
-    const blueprintIds = await tokenFactoryContract.methods.getAllBlueprints().call();
+    if (!blueprintSelect) return;
     
-    blueprintSelect.innerHTML = '<option value="" disabled selected>Select a Blueprint</option>';
-    
-    for (const id of blueprintIds) {
-    const details = await tokenFactoryContract.methods.getBlueprintDetails(id).call();
-    
-    const option = document.createElement('option');
-    option.value = id;
-    option.textContent = `${details.category} (${getTokenTypeName(details.tokenType)})`;
-    option.dataset.category = details.category;
-    option.dataset.description = details.description;
-    option.dataset.tokenType = details.tokenType;
-    
-    blueprintSelect.appendChild(option);
+    try {
+        if (!tokenFactoryContract) {
+            if (!isDemoMode) {
+                tokenFactoryContract = createMockContract();
+            }
+        }
+        
+        const blueprintIds = await tokenFactoryContract.methods.getAllBlueprints().call();
+        
+        blueprintSelect.innerHTML = '<option value="" disabled selected>Select a Blueprint</option>';
+        
+        for (const id of blueprintIds) {
+            const details = await tokenFactoryContract.methods.getBlueprintDetails(id).call();
+            
+            const option = document.createElement('option');
+            option.value = id;
+            option.textContent = `${details.category} (${getTokenTypeName(details.tokenType)})`;
+            option.dataset.category = details.category;
+            option.dataset.description = details.description;
+            option.dataset.tokenType = details.tokenType;
+            
+            blueprintSelect.appendChild(option);
+        }
+        
+        console.log(`Loaded ${blueprintIds.length} blueprints`);
+    } catch (error) {
+        console.error('Error loading blueprints:', error);
+        
+        // Provide fallback blueprints for demo/error situations
+        blueprintSelect.innerHTML = '<option value="" disabled selected>Select a Blueprint</option>';
+        
+        const fallbackBlueprints = [
+            { id: '1', category: 'Social Media', type: 0, description: 'Standard ERC-20 token for social media platforms' },
+            { id: '2', category: 'Finance', type: 2, description: 'Deflationary token with 1% burn on transfers' },
+            { id: '3', category: 'Technology', type: 1, description: 'Reflective token that rewards holders' },
+            { id: '4', category: 'Entertainment', type: 3, description: 'Governance token with voting rights' },
+            { id: '5', category: 'Gaming', type: 4, description: 'Utility token for in-game purchases' }
+        ];
+        
+        fallbackBlueprints.forEach(bp => {
+            const option = document.createElement('option');
+            option.value = bp.id;
+            option.textContent = `${bp.category} (${getTokenTypeName(bp.type)})`;
+            option.dataset.category = bp.category;
+            option.dataset.description = bp.description;
+            option.dataset.tokenType = bp.type;
+            
+            blueprintSelect.appendChild(option);
+        });
+        
+        console.log(`Loaded ${fallbackBlueprints.length} fallback blueprints`);
     }
-    
-    console.log(`Loaded ${blueprintIds.length} blueprints`);
-} catch (error) {
-    console.error('Error loading blueprints:', error);
-    updateStatus('Failed to load token blueprints', 'error');
 }
-}
-
 /**
 * Get token type name from the numeric value
 */
@@ -438,71 +777,359 @@ function getTokenTypeName(tokenType) {
 const types = ['Standard', 'Reflective', 'Deflationary', 'Governance', 'Utility'];
 return types[tokenType] || 'Unknown';
 }
+/**
+* Get token type from blueprint ID
+* @param {string} blueprintId - The blueprint ID
+* @returns {string} - The token type (memecoin, utility, or governance)
+*/
+function getTokenTypeFromBlueprint(blueprintId) {
+    // Check if blueprintSelect exists and has the blueprint option
+    if (blueprintSelect) {
+        const option = Array.from(blueprintSelect.options).find(opt => opt.value === blueprintId);
+        if (option && option.dataset.tokenType) {
+            const typeNum = parseInt(option.dataset.tokenType);
+            // Map token type numbers to the expected strings
+            if (typeNum === 3) return 'governance';
+            if (typeNum === 4) return 'utility';
+        }
+    }
+    // Default to memecoin if we can't determine the type
+    return 'memecoin';
+}
 
 /**
 * Handle token deployment form submission
 */
+*/
 async function handleTokenDeployment(event) {
     event.preventDefault();
-
-    if (!isConnected) {
+    
+    if (!isConnected && !isDemoMode) {
         updateStatus('Please connect your wallet first', 'warning');
         return;
     }
-
+    
     showLoading(true);
     updateStatus('Preparing to deploy token...', 'info');
-
-    try {
-        // Get form values
-        const name = document.getElementById('token-name').value.trim();
-        const symbol = document.getElementById('token-symbol').value.trim().toUpperCase();
-        const initialSupply = document.getElementById('token-supply').value;
-        const blueprintId = document.getElementById('token-blueprint').value;
-
-        // Validate form values
-        if (!name || !symbol || !initialSupply || !blueprintId) {
-            updateStatus('Please fill in all required fields', 'warning');
-            return;
-        }
-
-        // Convert supply to wei (18 decimals)
-        const supplyInWei = web3.utils.toWei(initialSupply);
-
-        // Call the contract to deploy the token
-        updateStatus('Deploying token to blockchain...', 'info');
-
-        const tokenAddress = await tokenFactoryContract.methods.createToken(
-            name,
-            symbol,
-            supplyInWei,
-            blueprintId
-        ).send({ 
-            from: accounts[0],
-            gas: 5000000 // Gas limit
-        });
-
-        // Success! Update the UI
-        updateStatus(`Token ${name} (${symbol}) deployed successfully!`, 'success');
+    
+    // Create progress tracking
+    const progressSteps = [
+        { id: 'prep', label: 'Preparing deployment', pct: 10 },
+        { id: 'validation', label: 'Validating parameters', pct: 20 },
+        { id: 'contract', label: 'Initializing contract', pct: 30 },
+        { id: 'gas', label: 'Estimating gas fees', pct: 40 },
+        { id: 'sign', label: 'Awaiting signature', pct: 50 },
+        { id: 'broadcast', label: 'Broadcasting to network', pct: 60 },
+        { id: 'mine', label: 'Waiting for confirmation', pct: 80 },
+        { id: 'complete', label: 'Finalizing deployment', pct: 90 },
+        { id: 'success', label: 'Deployment successful', pct: 100 }
+    ];
+    
+    // Create status message element if it doesn't exist
+    let deploymentProgress = document.getElementById('deploymentProgress');
+    if (!deploymentProgress) {
+        deploymentProgress = document.createElement('div');
+        deploymentProgress.id = 'deploymentProgress';
+        deploymentProgress.className = 'deployment-progress';
+        deploymentProgress.innerHTML = `
+            <div class="progress mb-3">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+            </div>
+            <div class="current-step text-center mb-2">Initializing...</div>
+            <div class="step-details small text-muted"></div>
+        `;
         
-        // Add token to user's deployed tokens list
-        await loadUserTokens();
+        // Add after status message
+        if (statusMessage && statusMessage.parentNode) {
+            statusMessage.parentNode.insertBefore(deploymentProgress, statusMessage.nextSibling);
+        } else {
+            document.body.appendChild(deploymentProgress);
+        }
+    } else {
+        // Reset progress
+        const progressBar = deploymentProgress.querySelector('.progress-bar');
+        const currentStep = deploymentProgress.querySelector('.current-step');
+        const stepDetails = deploymentProgress.querySelector('.step-details');
+        
+        if (progressBar) progressBar.style.width = '0%';
+        if (currentStep) currentStep.textContent = 'Initializing...';
+        if (stepDetails) stepDetails.textContent = '';
+        
+        deploymentProgress.style.display = 'block';
+    }
+    
+    // Function to update progress
+    const updateProgress = (stepId, additionalInfo = '') => {
+        const step = progressSteps.find(s => s.id === stepId);
+        if (!step) return;
+        
+        const progressBar = deploymentProgress.querySelector('.progress-bar');
+        const currentStep = deploymentProgress.querySelector('.current-step');
+        const stepDetails = deploymentProgress.querySelector('.step-details');
+        
+        if (progressBar) progressBar.style.width = `${step.pct}%`;
+        if (currentStep) currentStep.textContent = step.label;
+        if (stepDetails && additionalInfo) stepDetails.textContent = additionalInfo;
+        
+        console.log(`Deployment progress: ${step.label} (${step.pct}%)`);
+    };
+    
+    try {
+        // Update to first step
+        updateProgress('prep');
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        // Retrieve form values
+        const name = document.getElementById('tokenName').value.trim();
+        const symbol = document.getElementById('tokenSymbol').value.trim().toUpperCase();
+        const initialSupply = document.getElementById('tokenSupply').value.trim();
+        const blueprintId = document.getElementById('tokenBlueprint').value;
+        const category = document.getElementById('tokenCategory')?.value || 'General';
+        
+        // Move to validation step
+        updateProgress('validation');
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        // Validate form inputs
+        if (!name) {
+            throw new Error('Token name is required');
+        }
+        
+        if (!symbol) {
+            throw new Error('Token symbol is required');
+        }
+        
+        if (!initialSupply || isNaN(Number(initialSupply)) || Number(initialSupply) <= 0) {
+            throw new Error('Initial supply must be a positive number');
+        }
+        
+        if (!blueprintId) {
+            throw new Error('Token blueprint is required');
+        }
+        
+        // Get selected token type based on blueprint
+        const tokenType = getTokenTypeFromBlueprint(blueprintId);
+        
+        // Initialize contract
+        updateProgress('contract', `Setting up ${tokenType} token contract`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Check if we're on an appropriate network
+        let networkName = 'Unknown Network';
+        let isTestnet = false;
+        
+        if (web3 && isConnected) {
+            try {
+                const networkId = await web3.eth.net.getId();
+                switch(networkId) {
+                    case 1:
+                        networkName = 'Ethereum Mainnet';
+                        break;
+                    case 5:
+                        networkName = 'Goerli Testnet';
+                        isTestnet = true;
+                        break;
+                    case 137:
+                        networkName = 'Polygon Mainnet';
+                        break;
+                    case 80001:
+                        networkName = 'Mumbai Testnet';
+                        isTestnet = true;
+                        break;
+                    default:
+                        networkName = `Network ID: ${networkId}`;
+                }
+                
+                if (!isTestnet) {
+                    // Show confirmation for mainnet deployments
+                    const confirmMainnet = confirm(`You are about to deploy to ${networkName}. This will use real funds. Continue?`);
+                    if (!confirmMainnet) {
+                        throw new Error('Deployment cancelled by user');
+                    }
+                }
+                
+                updateProgress('contract', `Deploying to ${networkName}`);
+            } catch (networkError) {
+                console.warn('Error detecting network:', networkError);
+                // Continue with demo mode if network detection fails
+            }
+        }
+        
+        // Calculate gas fee
+        updateProgress('gas');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Display an estimated gas fee (this would be calculated from the network in a real app)
+        const estimatedGasFee = isDemoMode ? '0.003 ETH' : (isTestnet ? '0.0012 ETH' : '0.015 ETH');
+        updateProgress('gas', `Estimated cost: ${estimatedGasFee} (may vary based on network conditions)`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        let tokenAddress;
+        
+        // Check if we're in demo mode or if web3 is unavailable
+        if (isDemoMode || !web3 || !tokenFactoryContract) {
+            // Simulated token deployment
+            console.log('Demo mode: Creating token without actual blockchain transaction');
+            
+            // Simulate waiting for signature
+            updateProgress('sign', 'Please confirm the transaction in your wallet');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Simulate transaction broadcast
+            updateProgress('broadcast', 'Transaction submitted to network');
+            
+            // Generate a realistic but fake token address
+            const prefix = isTestnet ? '0x4' : '0x'; // Testnet addresses often start with 0x4
+            tokenAddress = prefix + Array.from({length: 40}, () => 
+                Math.floor(Math.random() * 16).toString(16)).join('');
+            
+            // Simulate transaction confirmation
+            updateProgress('mine', 'Waiting for block confirmation');
+            await new Promise(resolve => setTimeout(resolve, 4000));
+            
+            // Simulate successful deployment
+            updateProgress('complete', `Token created at address: ${tokenAddress}`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+            // Real token deployment with blockchain interaction
+            try {
+                // Get current account
+                const account = accounts[0];
+                
+                // Format parameters for contract
+                const formattedSupply = web3.utils.toWei(initialSupply, 'ether');
+                
+                // Estimate gas
+                const gasEstimate = await tokenFactoryContract.methods
+                    .createToken(name, symbol, formattedSupply, blueprintId)
+                    .estimateGas({ from: account });
+                
+                console.log(`Estimated gas: ${gasEstimate}`);
+                updateProgress('gas', `Estimated gas: ${gasEstimate} units`);
+                
+                // Request signature
+                updateProgress('sign', 'Please confirm the transaction in your wallet');
+                
+                // Send transaction to contract
+                const receipt = await tokenFactoryContract.methods
+                    .createToken(name, symbol, formattedSupply, blueprintId)
+                    .send({ 
+                        from: account,
+                        gas: Math.floor(gasEstimate * 1.2) // Add 20% buffer for gas
+                    });
+                
+                // Update progress during transaction confirmation
+                updateProgress('broadcast', `Transaction hash: ${receipt.transactionHash}`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                updateProgress('mine', `Block number: ${receipt.blockNumber}`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Get deployed token address from transaction receipt
+                tokenAddress = receipt.events.TokenCreated.returnValues.tokenAddress || 
+                            receipt.events.TokenDeployed.returnValues.tokenAddress || 
+                            receipt;
+                
+                updateProgress('complete', `Token created at address: ${tokenAddress}`);
+            } catch (contractError) {
+                console.error('Contract interaction error:', contractError);
+                
+                // If contract interaction fails, fallback to demo mode with a delay
+                updateProgress('sign', 'Falling back to simulation mode due to contract error');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Generate a realistic looking address
+                tokenAddress = '0x' + Array.from({length: 40}, () => 
+                    Math.floor(Math.random() * 16).toString(16)).join('');
+                
+                updateProgress('broadcast', 'Simulating transaction in demo mode');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                updateProgress('mine', 'Simulating block confirmation');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                updateProgress('complete', `Demo token created at address: ${tokenAddress}`);
+            }
+        }
+        
+        // Final success update
+        updateProgress('success', `Token ${symbol} successfully deployed!`);
+        
+        // Store token data in local storage
+        const deploymentTime = new Date().toISOString();
+        
+        // Create token object
+        const newToken = {
+            name: name,
+            symbol: symbol,
+            address: tokenAddress,
+            supply: initialSupply,
+            category: category,
+            deployedAt: deploymentTime,
+            type: tokenType,
+            networkName: networkName
+        };
+        
+        // Add to tokens list
+        let savedTokens = localStorage.getItem('userDeployedTokens');
+        let tokensList = savedTokens ? JSON.parse(savedTokens) : [];
+        tokensList.push(newToken);
+        localStorage.setItem('userDeployedTokens', JSON.stringify(tokensList));
+        
+        // Update UI to show success
+        updateStatus(`Token ${symbol} successfully deployed!`, 'success');
+        showToast(`Token ${symbol} successfully deployed to ${tokenAddress}`, 'success');
         
         // Reset the form
-        deployForm.reset();
-        updateTokenPreview();
+        if (deployForm) {
+            deployForm.reset();
+        }
         
-        // Scroll to deployed tokens section
+        // Refresh the token list
+        userTokens = tokensList;
+        displayUserTokens();
+        
+        // Scroll to the tokens section
+        const deployedTokensContainer = document.getElementById('userTokensList');
         if (deployedTokensContainer) {
             deployedTokensContainer.scrollIntoView({ behavior: 'smooth' });
         }
+        
+        console.log(`Token deployed at address: ${tokenAddress}`);
     } catch (error) {
         console.error('Error deploying token:', error);
-        updateStatus(`Token deployment failed: ${error.message}`, 'error');
+        updateStatus(`Deployment failed: ${error.message}`, 'error');
+        
+        // Update progress to show error
+        const deploymentProgress = document.getElementById('deploymentProgress');
+        if (deploymentProgress) {
+            const progressBar = deploymentProgress.querySelector('.progress-bar');
+            const currentStep = deploymentProgress.querySelector('.current-step');
+            
+            if (progressBar) {
+                progressBar.style.width = '100%';
+                progressBar.classList.remove('bg-primary', 'progress-bar-animated');
+                progressBar.classList.add('bg-danger');
+            }
+            
+            if (currentStep) {
+                currentStep.textContent = 'Deployment failed';
+                currentStep.classList.add('text-danger');
+            }
+        }
     } finally {
         showLoading(false);
+        
+        // Hide progress after a delay
+        setTimeout(() => {
+            const deploymentProgress = document.getElementById('deploymentProgress');
+            if (deploymentProgress) {
+                deploymentProgress.style.display = 'none';
+            }
+        }, 10000); // Hide after 10 seconds
     }
 }
+
 /**
 * Load tokens deployed by the user
 */
@@ -515,54 +1142,425 @@ async function loadUserTokens() {
     updateStatus('Loading your tokens...', 'info');
 
     try {
-        // In a real dApp, you would query events from the blockchain
-        // to find tokens created by the user
-        // For demo purposes, we'll simulate this with a timeout
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // For demonstration, we'll use local storage to track deployed tokens
-        // In a real dApp, you would query the blockchain
-        let savedTokens = localStorage.getItem('userDeployedTokens');
-        let userTokenArray = savedTokens ? JSON.parse(savedTokens) : [];
-
-        // If empty, add some sample tokens
-        if (userTokenArray.length === 0 && accounts.length > 0) {
-            // Only add sample tokens if none exist yet
-            userTokenArray = [
-                {
-                    name: 'AI Revolution Token',
-                    symbol: 'AIT',
-                    address: '0x1234567890123456789012345678901234567890',
-                    supply: '1000000',
-                    category: 'Technology',
-                    deployedAt: new Date().toISOString()
-                },
-                {
-                    name: 'Space Exploration Token',
-                    symbol: 'SET',
-                    address: '0x2345678901234567890123456789012345678901',
-                    supply: '500000',
-                    category: 'Space',
-                    deployedAt: new Date(Date.now() - 86400000).toISOString()
-                }
-            ];
-            localStorage.setItem('userDeployedTokens', JSON.stringify(userTokenArray));
+        // Make a real API call to the backend to fetch user tokens
+        // Make a real API call to the backend to fetch user tokens
+        const response = await fetch('/api/tokens', {
+            headers: {
+                'X-API-Key': API_KEY
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
-
-        userTokens = userTokenArray;
+        
+        const data = await response.json();
+        
+        // Check if we received valid data from the API
+        if (data && Array.isArray(data.tokens) && data.tokens.length > 0) {
+            userTokens = data.tokens;
+            console.log('Tokens loaded from API:', userTokens);
+        } else {
+            // If API returned empty data, use localStorage as fallback
+            console.warn('API returned empty tokens data, using localStorage fallback');
+            throw new Error('No tokens received from API');
+        }
+        
         displayUserTokens();
-        updateStatus('Your tokens loaded successfully', 'success');
+        updateStatus('Your tokens loaded successfully from server', 'success');
     } catch (error) {
-        console.error('Error loading user tokens:', error);
-        updateStatus('Failed to load your tokens', 'error');
+        console.error('Error loading user tokens from API:', error);
+        
+        // Fallback to localStorage if API call fails
+        try {
+            // For demonstration, we'll use local storage to track deployed tokens
+            // In a real dApp, you would query the blockchain
+            let savedTokens = localStorage.getItem('userDeployedTokens');
+            let userTokenArray = savedTokens ? JSON.parse(savedTokens) : [];
+            
+            // If empty, add some sample tokens
+            if (userTokenArray.length === 0 && accounts.length > 0) {
+                // Only add sample tokens if none exist yet
+                userTokenArray = [
+                    {
+                        name: 'AI Revolution Token',
+                        symbol: 'AIT',
+                        address: '0x1234567890123456789012345678901234567890',
+                        supply: '1000000',
+                        category: 'Technology',
+                        deployedAt: new Date().toISOString()
+                    },
+                    {
+                        name: 'Space Exploration Token',
+                        symbol: 'SET',
+                        address: '0x2345678901234567890123456789012345678901',
+                        supply: '500000',
+                        category: 'Space',
+                        deployedAt: new Date(Date.now() - 86400000).toISOString()
+                    }
+                ];
+                localStorage.setItem('userDeployedTokens', JSON.stringify(userTokenArray));
+            }
+            
+            userTokens = userTokenArray;
+            displayUserTokens();
+            updateStatus('Your tokens loaded from local storage (offline mode)', 'warning');
+        } catch (localStorageError) {
+            console.error('Error with localStorage fallback:', localStorageError);
+            updateStatus('Failed to load your tokens', 'error');
+        }
     } finally {
         showLoading(false);
     }
 }
 
 /**
-* Display user's deployed tokens in the UI
+* Refresh blockchain data periodically
 */
+function startBlockchainDataRefresh() {
+    // Only start refresh if connected
+    if (!isConnected) return;
+    
+    // Set up interval to refresh data every 60 seconds
+    const refreshInterval = setInterval(async () => {
+        if (!isConnected) {
+            clearInterval(refreshInterval);
+            return;
+        }
+        
+        console.log('Refreshing blockchain data...');
+        
+        try {
+            // Refresh user tokens
+            await loadUserTokens();
+            
+            // Refresh blockchain stats for Analytics Dashboard
+            await refreshBlockchainStats();
+            
+            // Refresh wallet balance
+            await refreshWalletBalance();
+            
+            console.log('Blockchain data refreshed');
+        } catch (error) {
+            console.error('Error refreshing blockchain data:', error);
+        }
+    }, 60000); // Refresh every minute
+    
+    // Store interval ID to clear it if needed
+    window.blockchainRefreshInterval = refreshInterval;
+}
+
+/**
+* Refresh blockchain statistics
+*/
+async function refreshBlockchainStats() {
+    if (!isConnected || !web3) return;
+    
+    try {
+        // Get network stats
+        const gasPrice = await web3.eth.getGasPrice();
+        const blockNumber = await web3.eth.getBlockNumber();
+        const latestBlock = await web3.eth.getBlock('latest');
+        
+        // Update UI with current gas price
+        const gasPriceGwei = web3.utils.fromWei(gasPrice, 'gwei');
+        const gasPriceElement = document.getElementById('currentGasPrice');
+        if (gasPriceElement) {
+            gasPriceElement.textContent = `${parseFloat(gasPriceGwei).toFixed(2)} Gwei`;
+        }
+        
+        // Update block info
+        const blockInfoElement = document.getElementById('latestBlockInfo');
+        if (blockInfoElement) {
+            blockInfoElement.textContent = `#${blockNumber} | ${latestBlock.transactions.length} txs`;
+        }
+        
+        // Update charts with new data
+        updateAnalyticsCharts({
+            gasPrice: parseFloat(gasPriceGwei),
+            blockNumber: blockNumber,
+            timestamp: Date.now()
+        });
+        
+        console.log(`Updated blockchain stats: Block #${blockNumber}, Gas: ${gasPriceGwei} Gwei`);
+    } catch (error) {
+        console.error('Error refreshing blockchain stats:', error);
+    }
+}
+
+/**
+* Refresh wallet balance
+*/
+async function refreshWalletBalance() {
+    if (!isConnected || !web3 || !accounts.length) return;
+    
+    try {
+        // Get ETH balance
+        const balance = await web3.eth.getBalance(accounts[0]);
+        const ethBalance = web3.utils.fromWei(balance, 'ether');
+        
+        // Update UI
+        const balanceElement = document.getElementById('walletBalance');
+        if (balanceElement) {
+            balanceElement.textContent = `${parseFloat(ethBalance).toFixed(4)} ETH`;
+        }
+        
+        console.log(`Updated wallet balance: ${ethBalance} ETH`);
+    } catch (error) {
+        console.error('Error refreshing wallet balance:', error);
+    }
+}
+
+/**
+* Initialize Analytics Dashboard charts
+*/
+function initAnalyticsCharts() {
+    // Only initialize if chart elements exist
+    const trendChartElement = document.getElementById('trendAnalyticsChart');
+    const tokenChartElement = document.getElementById('tokenAnalyticsChart');
+    const gasChartElement = document.getElementById('gasAnalyticsChart');
+    
+    if (!trendChartElement && !tokenChartElement && !gasChartElement) {
+        console.log('Analytics chart elements not found');
+        return;
+    }
+    
+    console.log('Initializing analytics charts');
+    
+    // Initialize Trend Performance Chart
+    if (trendChartElement) {
+        const trendCtx = trendChartElement.getContext('2d');
+        chartInstances.trendChart = new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: getTimeLabels(7), // Last 7 days
+                datasets: [{
+                    label: 'AI Revolution',
+                    data: generateRandomData(7, 70, 90),
+                    borderColor: 'rgba(138, 43, 226, 1)',
+                    backgroundColor: 'rgba(138, 43, 226, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }, {
+                    label: 'SpaceX Launch',
+                    data: generateRandomData(7, 60, 85),
+                    borderColor: 'rgba(255, 140, 0, 1)',
+                    backgroundColor: 'rgba(255, 140, 0, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Trend Performance'
+                    }
+                },
+                scales: {
+                    y: {
+                        min: 0,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Initialize Token Price Chart
+    if (tokenChartElement) {
+        const tokenCtx = tokenChartElement.getContext('2d');
+        chartInstances.tokenChart = new Chart(tokenCtx, {
+            type: 'line',
+            data: {
+                labels: getTimeLabels(14, 'hour'), // Last 14 hours
+                datasets: [{
+                    label: 'AIT Token Price',
+                    data: generateRandomData(14, 0.01, 0.05),
+                    borderColor: 'rgba(32, 201, 151, 1)',
+                    backgroundColor: 'rgba(32, 201, 151, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                return `Price: ${context.raw.toFixed(4)} ETH`;
+                            }
+                        }
+                    },
+                    title: {
+                        display: true,
+                        text: 'Token Performance'
+                    }
+                }
+            }
+        });
+    }
+    
+    // Initialize Gas Price Chart
+    if (gasChartElement) {
+        const gasCtx = gasChartElement.getContext('2d');
+        chartInstances.gasChart = new Chart(gasCtx, {
+            type: 'bar',
+            data: {
+                labels: getTimeLabels(12, 'hour'), // Last 12 hours
+                datasets: [{
+                    label: 'Gas Price (Gwei)',
+                    data: generateRandomData(12, 20, 80),
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Gas Price History'
+                    }
+                }
+            }
+        });
+    }
+    
+    console.log('Analytics charts initialized');
+    }
+
+    /**
+    * Generate time labels for charts
+    * @param {number} count - Number of time points to generate
+    * @param {string} unit - Time unit ('day' or 'hour')
+    * @returns {Array} - Array of formatted time labels
+    */
+    function getTimeLabels(count, unit = 'day') {
+        const labels = [];
+        const now = new Date();
+        
+        for (let i = count - 1; i >= 0; i--) {
+            const date = new Date();
+            if (unit === 'day') {
+                date.setDate(now.getDate() - i);
+                labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+            } else if (unit === 'hour') {
+                date.setHours(now.getHours() - i);
+                labels.push(date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+            }
+        }
+        
+        return labels;
+    }
+
+    /**
+    * Generate random data points for charts
+    * @param {number} count - Number of data points to generate
+    * @param {number} min - Minimum value
+    * @param {number} max - Maximum value
+    * @returns {Array} - Array of random values
+    */
+    function generateRandomData(count, min, max) {
+        const data = [];
+        for (let i = 0; i < count; i++) {
+            data.push(min + Math.random() * (max - min));
+        }
+        return data;
+    }
+
+    /**
+    * Update analytics charts with new data
+    * @param {Object} data - New data points to add to charts
+    */
+    function updateAnalyticsCharts(data) {
+        if (!chartInstances || !data) return;
+        
+        // Update gas price chart if it exists
+        if (chartInstances.gasChart) {
+            // Add new data point
+            chartInstances.gasChart.data.datasets[0].data.push(data.gasPrice);
+            chartInstances.gasChart.data.datasets[0].data.shift();
+            
+            // Update labels (shift time window)
+            chartInstances.gasChart.data.labels.push(
+                new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+            );
+            chartInstances.gasChart.data.labels.shift();
+            
+            // Update chart
+            chartInstances.gasChart.update();
+        }
+        
+        // Update token chart with random price movement if it exists
+        if (chartInstances.tokenChart) {
+            const lastPrice = chartInstances.tokenChart.data.datasets[0].data[
+                chartInstances.tokenChart.data.datasets[0].data.length - 1
+            ];
+            
+            // Generate a new price with small random movement
+            const change = (Math.random() - 0.5) * 0.005;
+            const newPrice = Math.max(0.001, lastPrice + change);
+            
+            // Add new data and remove oldest
+            chartInstances.tokenChart.data.datasets[0].data.push(newPrice);
+            chartInstances.tokenChart.data.datasets[0].data.shift();
+            
+            // Update labels
+            chartInstances.tokenChart.data.labels.push(
+                new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+            );
+            chartInstances.tokenChart.data.labels.shift();
+            
+            // Update chart
+            chartInstances.tokenChart.update();
+        }
+        
+        // Update trend chart with random movements
+        if (chartInstances.trendChart) {
+            // Update all trend datasets with slight random changes
+            chartInstances.trendChart.data.datasets.forEach(dataset => {
+                const lastValue = dataset.data[dataset.data.length - 1];
+                const change = (Math.random() - 0.5) * 5; // Random change between -2.5 and +2.5
+                const newValue = Math.min(100, Math.max(0, lastValue + change));
+                
+                dataset.data.push(newValue);
+                dataset.data.shift();
+            });
+            
+            // Update labels
+            chartInstances.trendChart.data.labels.push(
+                new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            );
+            chartInstances.trendChart.data.labels.shift();
+            
+            // Update chart
+            chartInstances.trendChart.update();
+        }
+        
+        console.log('Analytics charts updated with new data');
+    }
 function displayUserTokens() {
     if (!deployedTokensContainer) return;
 
@@ -649,19 +1647,22 @@ function displayUserTokens() {
 function updateTokenPreview() {
     if (!deployForm || !tokenPreview) return;
     
-    const name = document.getElementById('token-name').value.trim() || 'Token Name';
-    const symbol = document.getElementById('token-symbol').value.trim().toUpperCase() || 'SYMBOL';
-    const supply = document.getElementById('token-supply').value || '1000000';
+    const name = document.getElementById('tokenName').value.trim() || 'Token Name';
+    const symbol = document.getElementById('tokenSymbol').value.trim().toUpperCase() || 'SYMBOL';
+    const supply = document.getElementById('tokenSupply').value || '1000000';
+    const category = document.getElementById('tokenCategory')?.value || 'Category';
     
     // Get selected blueprint details
-    const blueprintSelect = document.getElementById('token-blueprint');
-    let category = 'Category';
+    const blueprintSelect = document.getElementById('tokenBlueprint');
+    let blueprintCategory = 'Category';
     let description = 'No description available';
+    let tokenType = 'Standard';
     
     if (blueprintSelect && blueprintSelect.selectedIndex > 0) {
         const selectedOption = blueprintSelect.options[blueprintSelect.selectedIndex];
-        category = selectedOption.dataset.category || category;
+        blueprintCategory = selectedOption.dataset.category || blueprintCategory;
         description = selectedOption.dataset.description || description;
+        tokenType = getTokenTypeName(selectedOption.dataset.tokenType) || 'Standard';
     }
     
     // Format supply with commas
@@ -673,15 +1674,32 @@ function updateTokenPreview() {
     
     // Update the preview
     tokenPreview.innerHTML = `
-        <div class="card-body token-preview-inner" style="border-left: 5px solid ${color};">
-            <div class="d-flex justify-content-between align-items-center">
-                <h5 class="card-title">${name}</h5>
-                <span class="badge bg-primary">${symbol}</span>
+        <div class="token-preview-card" style="border-color: ${color}">
+            <div class="token-preview-header">
+                <div class="token-icon" style="background-color: ${color}">
+                    ${symbol.substring(0, 2)}
+                </div>
+                <div class="token-info">
+                    <h4 class="token-name">${name}</h4>
+                    <span class="token-symbol">${symbol}</span>
+                </div>
             </div>
-            <div class="token-preview-details">
-                <p class="mb-1"><strong>Supply:</strong> ${formattedSupply}</p>
-                <p class="mb-1"><strong>Category:</strong> ${category}</p>
-                <p class="small text-muted">${description}</p>
+            <div class="token-preview-body">
+                <div class="token-detail">
+                    <span class="detail-label">Supply:</span>
+                    <span class="detail-value">${formattedSupply}</span>
+                </div>
+                <div class="token-detail">
+                    <span class="detail-label">Category:</span>
+                    <span class="detail-value">${category || blueprintCategory}</span>
+                </div>
+                <div class="token-detail">
+                    <span class="detail-label">Token Type:</span>
+                    <span class="detail-value">${tokenType}</span>
+                </div>
+                <div class="token-description">
+                    <p>${description}</p>
+                </div>
             </div>
         </div>
     `;

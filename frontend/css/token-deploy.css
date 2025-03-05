@@ -1,0 +1,453 @@
+/* Token Deployment Process Styling */
+:root {
+--primary-color: #6a11cb;
+--secondary-color: #f37335;
+--success-color: #28a745;
+--warning-color: #ffc107;
+--danger-color: #dc3545;
+--light-bg: #f8f9fa;
+--dark-bg: #343a40;
+}
+
+/* Deployment Progress Container */
+.deployment-progress {
+background: linear-gradient(45deg, rgba(106, 17, 203, 0.05), rgba(243, 115, 53, 0.05));
+border-radius: 12px;
+padding: 1.5rem;
+margin-bottom: 2rem;
+box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+transition: all 0.3s ease;
+}
+
+.deployment-progress:hover {
+box-shadow: 0 6px 25px rgba(106, 17, 203, 0.15);
+}
+
+/* Progress Steps */
+.progress-steps {
+display: flex;
+justify-content: space-between;
+margin-bottom: 1.5rem;
+position: relative;
+}
+
+.progress-steps:before {
+content: '';
+position: absolute;
+top: 15px;
+left: 0;
+width: 100%;
+height: 3px;
+background-color: #e9ecef;
+z-index: 1;
+}
+
+.progress-step {
+position: relative;
+z-index: 2;
+display: flex;
+flex-direction: column;
+align-items: center;
+flex: 1;
+}
+
+.step-circle {
+width: 32px;
+height: 32px;
+border-radius: 50%;
+background-color: #e9ecef;
+display: flex;
+align-items: center;
+justify-content: center;
+color: #6c757d;
+font-weight: bold;
+margin-bottom: 0.5rem;
+border: 3px solid #fff;
+transition: all 0.3s ease;
+}
+
+.step-text {
+font-size: 0.8rem;
+color: #6c757d;
+text-align: center;
+transition: all 0.3s ease;
+}
+
+/* Active and Completed Steps */
+.step-active .step-circle {
+background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+color: white;
+box-shadow: 0 4px 10px rgba(106, 17, 203, 0.3);
+}
+
+.step-active .step-text {
+color: var(--primary-color);
+font-weight: 600;
+}
+
+.step-completed .step-circle {
+background-color: var(--success-color);
+color: white;
+}
+
+.step-completed .step-text {
+color: var(--success-color);
+}
+
+/* Progress Bar Animation */
+.progress-bar-container {
+height: 8px;
+background-color: #e9ecef;
+border-radius: 4px;
+margin-bottom: 1.5rem;
+overflow: hidden;
+}
+
+.progress-bar {
+height: 100%;
+background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+border-radius: 4px;
+transition: width 0.5s ease;
+position: relative;
+overflow: hidden;
+}
+
+.progress-bar:after {
+content: '';
+position: absolute;
+top: 0;
+left: 0;
+right: 0;
+bottom: 0;
+background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+);
+animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+0% { transform: translateX(-100%); }
+100% { transform: translateX(100%); }
+}
+
+/* Token Preview Card */
+.token-preview-card {
+background: white;
+border-radius: 16px;
+padding: 1.5rem;
+box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+transition: all 0.3s ease;
+border: 1px solid rgba(106, 17, 203, 0.1);
+position: relative;
+overflow: hidden;
+}
+
+.token-preview-card:hover {
+transform: translateY(-5px);
+box-shadow: 0 12px 40px rgba(106, 17, 203, 0.15);
+}
+
+.token-preview-card:before {
+content: '';
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 6px;
+background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+}
+
+.token-preview-header {
+display: flex;
+align-items: center;
+margin-bottom: 1.5rem;
+}
+
+.token-preview-icon {
+width: 50px;
+height: 50px;
+border-radius: 50%;
+background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+display: flex;
+align-items: center;
+justify-content: center;
+color: white;
+font-weight: bold;
+margin-right: 1rem;
+font-size: 1.25rem;
+}
+
+.token-preview-title {
+flex: 1;
+}
+
+.token-preview-title h4 {
+margin: 0;
+color: var(--dark-bg);
+font-weight: 700;
+}
+
+.token-preview-title p {
+margin: 0;
+color: #6c757d;
+font-size: 0.9rem;
+}
+
+.token-preview-details {
+display: grid;
+grid-template-columns: repeat(2, 1fr);
+gap: 1rem;
+margin-bottom: 1.5rem;
+}
+
+.token-detail-item {
+padding: 0.75rem;
+background-color: rgba(106, 17, 203, 0.05);
+border-radius: 8px;
+}
+
+.detail-label {
+font-size: 0.75rem;
+color: #6c757d;
+margin-bottom: 0.25rem;
+}
+
+.detail-value {
+font-weight: 600;
+color: var(--dark-bg);
+}
+
+/* Enhanced Wallet Connection UI */
+.wallet-connect-container {
+position: relative;
+display: inline-block;
+}
+
+.wallet-dropdown {
+position: absolute;
+top: 100%;
+right: 0;
+width: 280px;
+background: white;
+border-radius: 12px;
+box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+z-index: 1000;
+opacity: 0;
+transform: translateY(10px);
+pointer-events: none;
+transition: all 0.3s ease;
+}
+
+.wallet-connect-container:hover .wallet-dropdown,
+.wallet-dropdown.show {
+opacity: 1;
+transform: translateY(0);
+pointer-events: auto;
+}
+
+.wallet-item {
+display: flex;
+align-items: center;
+padding: 1rem;
+border-bottom: 1px solid #eee;
+cursor: pointer;
+transition: all 0.2s ease;
+}
+
+.wallet-item:last-child {
+border-bottom: none;
+}
+
+.wallet-item:hover {
+background-color: rgba(106, 17, 203, 0.05);
+}
+
+.wallet-icon {
+width: 36px;
+height: 36px;
+margin-right: 0.75rem;
+object-fit: contain;
+}
+
+.wallet-name {
+flex: 1;
+font-weight: 600;
+}
+
+.wallet-status {
+width: 8px;
+height: 8px;
+border-radius: 50%;
+margin-left: 0.5rem;
+}
+
+.wallet-status.connected {
+background-color: var(--success-color);
+}
+
+.wallet-status.disconnected {
+background-color: #dee2e6;
+}
+
+/* Connected Wallet Badge */
+.wallet-badge {
+display: inline-flex;
+align-items: center;
+padding: 0.5rem 1rem;
+background: linear-gradient(90deg, rgba(106, 17, 203, 0.1), rgba(243, 115, 53, 0.1));
+border-radius: 50px;
+font-size: 0.85rem;
+color: var(--dark-bg);
+transition: all 0.3s ease;
+}
+
+.wallet-badge:hover {
+background: linear-gradient(90deg, rgba(106, 17, 203, 0.15), rgba(243, 115, 53, 0.15));
+}
+
+.wallet-badge-icon {
+width: 24px;
+height: 24px;
+border-radius: 50%;
+background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+display: flex;
+align-items: center;
+justify-content: center;
+color: white;
+margin-right: 0.5rem;
+font-size: 0.75rem;
+}
+
+.wallet-address {
+font-family: monospace;
+font-weight: 600;
+}
+
+/* Token deploy button and status animation */
+.deploy-button {
+position: relative;
+padding: 0.75rem 2rem;
+background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+border: none;
+border-radius: 8px;
+color: white;
+font-weight: 600;
+cursor: pointer;
+transition: all 0.3s ease;
+overflow: hidden;
+}
+
+.deploy-button:hover {
+transform: translateY(-2px);
+box-shadow: 0 8px 20px rgba(106, 17, 203, 0.2);
+}
+
+.deploy-button:active {
+transform: translateY(0);
+}
+
+.deploy-button:disabled {
+background: #e9ecef;
+color: #adb5bd;
+cursor: not-allowed;
+transform: none;
+box-shadow: none;
+}
+
+.deploy-button .spinner {
+display: inline-block;
+width: 16px;
+height: 16px;
+border: 2px solid rgba(255, 255, 255, 0.5);
+border-radius: 50%;
+border-top-color: white;
+animation: spin 1s ease-in-out infinite;
+margin-right: 0.5rem;
+}
+
+@keyframes spin {
+0% { transform: rotate(0deg); }
+100% { transform: rotate(360deg); }
+}
+
+/* Status message styling */
+.status-message {
+padding: 1rem;
+border-radius: 8px;
+margin-bottom: 1rem;
+display: flex;
+align-items: center;
+animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+from { opacity: 0; transform: translateY(-10px); }
+to { opacity: 1; transform: translateY(0); }
+}
+
+.status-info {
+background-color: rgba(13, 110, 253, 0.1);
+border-left: 4px solid #0d6efd;
+}
+
+.status-success {
+background-color: rgba(40, 167, 69, 0.1);
+border-left: 4px solid #28a745;
+}
+
+.status-warning {
+background-color: rgba(255, 193, 7, 0.1);
+border-left: 4px solid #ffc107;
+}
+
+.status-error {
+background-color: rgba(220, 53, 69, 0.1);
+border-left: 4px solid #dc3545;
+}
+
+.status-icon {
+margin-right: 0.75rem;
+font-size: 1.25rem;
+}
+
+/* Loading overlay */
+.loading-overlay {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(0, 0, 0, 0.6);
+display: flex;
+align-items: center;
+justify-content: center;
+z-index: 9999;
+opacity: 0;
+pointer-events: none;
+transition: opacity 0.3s ease;
+}
+
+.loading-overlay.show {
+opacity: 1;
+pointer-events: auto;
+}
+
+.loading-spinner {
+width: 60px;
+height: 60px;
+border: 4px solid rgba(255, 255, 255, 0.2);
+border-radius: 50%;
+border-top-color: white;
+animation: spin 1s linear infinite;
+}
+
+.loading-text {
+position: absolute;
+bottom: -30px;
+color: white;
+font-weight: 500;
+}
+
