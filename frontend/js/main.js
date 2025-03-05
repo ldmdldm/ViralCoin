@@ -86,10 +86,53 @@ let isConnected = false;
 let trendingTopics = [];
 let chartInstances = {};
 let isDemoMode = false;
+let currentChainId = null;
 
-// Contract addresses (these would be network-specific)
+// Network configurations
+const SUPPORTED_NETWORKS = {
+    1: {
+        name: 'Ethereum Mainnet',
+        rpcUrl: 'https://mainnet.infura.io/v3/your-infura-key',
+        currency: 'ETH',
+        blockExplorer: 'https://etherscan.io'
+    },
+    5: {
+        name: 'Goerli Testnet',
+        rpcUrl: 'https://goerli.infura.io/v3/your-infura-key',
+        currency: 'ETH',
+        blockExplorer: 'https://goerli.etherscan.io'
+    },
+    137: {
+        name: 'Polygon Mainnet',
+        rpcUrl: 'https://polygon-rpc.com',
+        currency: 'MATIC',
+        blockExplorer: 'https://polygonscan.com',
+        isPolygon: true
+    },
+    80001: {
+        name: 'Mumbai Testnet',
+        rpcUrl: 'https://rpc-mumbai.maticvigil.com',
+        currency: 'MATIC',
+        blockExplorer: 'https://mumbai.polygonscan.com',
+        isPolygon: true,
+        isPreferred: true // Mark Mumbai as our preferred network
+    }
+};
+
+// Contract addresses (network-specific)
 const CONTRACT_ADDRESSES = {
-tokenFactory: '0x1234567890123456789012345678901234567890' // Replace with actual deployed address
+    1: {
+        tokenFactory: '0x1234567890123456789012345678901234567890' // Mainnet
+    },
+    5: {
+        tokenFactory: '0x1234567890123456789012345678901234567890' // Goerli
+    },
+    137: {
+        tokenFactory: '0x1234567890123456789012345678901234567890' // Polygon Mainnet
+    },
+    80001: {
+        tokenFactory: '0x9876543210987654321098765432109876543210' // Mumbai testnet
+    }
 };
 
 // DOM Elements
@@ -285,74 +328,202 @@ initAnalyticsCharts();
 }
 
 /**
-* Connect to Ethereum wallet (MetaMask)
+/**
+* Connect to Ethereum wallet (MetaMask, WalletConnect, etc.)
 */
 async function connectWallet() {
-showLoading(true);
-updateStatus('Connecting to wallet...', 'info');
+    showLoading(true);
+    updateStatus('Connecting to wallet...', 'info');
 
-try {
-    // Request account access
-    accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-    
-    // Create Web3 instance
-    web3 = new Web3(window.ethereum);
-    
-    // Get current network ID
-    const networkId = await web3.eth.net.getId();
-    console.log(`Connected to network ID: ${networkId}`);
-    
-    // Initialize contract instances
-    initializeContracts(networkId);
-    
-    // Update UI
-    handleAccountsChanged(accounts);
-    
-    // Set connected flag
-    isConnected = true;
-    localStorage.setItem('walletConnected', 'true');
-    
-    updateStatus('Wallet connected successfully', 'success');
-    
-    // Load user-specific data
-    await loadUserTokens();
-    await loadBlueprints();
-    
-    // Update UI based on connection
-    updateUIForConnectedState();
-    
-    // Initialize blockchain data refresh
-    startBlockchainDataRefresh();
-} catch (error) {
-    console.error('Error connecting wallet:', error);
-    updateStatus(`Connection failed: ${error.message}`, 'error');
-    isConnected = false;
-    localStorage.removeItem('walletConnected');
-} finally {
-    showLoading(false);
-}
+    try {
+        // Check if ethereum object exists
+        if (!window.ethereum) {
+            throw new Error('No wallet detected. Please install MetaMask or another Web3 wallet.');
+        }
+
+        // Request account access
+        accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        
+        // Create Web3 instance
+        web3 = new Web3(window.ethereum);
+        
+        // Get current network ID
+        const networkId = await web3.eth.net.getId();
+        currentChainId = networkId;
+        console.log(`Connected to network ID: ${networkId}`);
+        
+        // Check if connected to a supported network
+        const isSupported = SUPPORTED_NETWORKS[networkId] !== undefined;
+        if (!isSupported) {
+            showToast(`Network ID ${networkId} is not supported. Please switch to Polygon Mumbai Testnet.`, 'warning');
+            await switchToMumbaiNetwork();
+            return;
+        }
+        
+        // Check if we should switch to the preferred network (Mumbai testnet)
+        const connectedNetwork = SUPPORTED_NETWORKS[networkId];
+        if (!connectedNetwork.isPreferred) {
+            const shouldSwitch = confirm(`You are currently connected to ${connectedNetwork.name}. We recommend using Polygon Mumbai Testnet for testing. Would you like to switch?`);
+            if (shouldSwitch) {
+                await switchToMumbaiNetwork();
+                return;
+            }
+        }
+        
+        // Initialize contract instances with correct network
+        initializeContracts(networkId);
+        
+        // Update UI
+        handleAccountsChanged(accounts);
+        
+        // Set connected flag
+        isConnected = true;
+        localStorage.setItem('walletConnected', 'true');
+        
+        // Update network information in UI
+        updateNetworkInfo(networkId);
+        
+        updateStatus(`Wallet connected to ${SUPPORTED_NETWORKS[networkId].name}`, 'success');
+        
+        // Load user-specific data
+        await loadUserTokens();
+        await loadBlueprints();
+        
+        // Update UI based on connection
+        updateUIForConnectedState();
+        
+        // Initialize blockchain data refresh
+        startBlockchainDataRefresh();
+        
+        // Refresh wallet balance
+        await refreshWalletBalance();
+    } catch (error) {
+        console.error('Error connecting wallet:', error);
+        updateStatus(`Connection failed: ${error.message}`, 'error');
+        isConnected = false;
+        localStorage.removeItem('walletConnected');
+    } finally {
+        showLoading(false);
+    }
 }
 
+/**
+* Attempt to switch to Mumbai Testnet
+*/
+async function switchToMumbaiNetwork() {
+    try {
+        showLoading(true);
+        updateStatus('Switching to Mumbai Testnet...', 'info');
+        
+        // Mumbai Testnet parameters
+        const mumbaiChainId = '0x13881'; // 80001 in hex
+        
+        try {
+            // Try to switch to Mumbai
+            await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: mumbaiChainId }],
+            });
+            
+            // If successful, refresh the page to ensure everything loads correctly
+            window.location.reload();
+            return;
+        } catch (switchError) {
+            // This error code indicates that the chain has not been added to MetaMask
+            if (switchError.code === 4902) {
+                try {
+                    await window.ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [{
+                            chainId: mumbaiChainId,
+                            chainName: 'Polygon Mumbai Testnet',
+                            nativeCurrency: {
+                                name: 'MATIC',
+                                symbol: 'MATIC',
+                                decimals: 18
+                            },
+                            rpcUrls: ['https://rpc-mumbai.maticvigil.com'],
+                            blockExplorerUrls: ['https://mumbai.polygonscan.com']
+                        }]
+                    });
+                    
+                    // Try switching again after adding the network
+                    await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: mumbaiChainId }],
+                    });
+                    
+                    // If successful, refresh the page
+                    window.location.reload();
+                    return;
+                } catch (addError) {
+                    throw new Error(`Error adding Mumbai network: ${addError.message}`);
+                }
+            } else {
+                throw new Error(`Error switching network: ${switchError.message}`);
+            }
+        }
+    } catch (error) {
+        console.error('Error switching to Mumbai Testnet:', error);
+        updateStatus(`Network switch failed: ${error.message}`, 'error');
+        showToast('Please manually switch to Mumbai Testnet in your wallet', 'warning');
+    } finally {
+        showLoading(false);
+    }
+}
+
+/**
+* Update network information in the UI
+*/
+function updateNetworkInfo(networkId) {
+    const networkInfo = SUPPORTED_NETWORKS[networkId];
+    if (!networkInfo) return;
+    
+    const networkDisplay = document.querySelector('.wallet-network');
+    if (networkDisplay) {
+        networkDisplay.textContent = networkInfo.name;
+        networkDisplay.className = 'wallet-network'; // Reset classes
+        
+        // Add network-specific class
+        if (networkInfo.isPolygon) {
+            networkDisplay.classList.add('network-polygon');
+        }
+        
+        // Show connection type
+        if (networkId === 80001 || networkId === 5) {
+            networkDisplay.classList.add('network-testnet');
+        } else {
+            networkDisplay.classList.add('network-mainnet');
+        }
+    }
+    
+    // Update currency symbol
+    const balanceAmount = document.querySelector('.balance-amount');
+    if (balanceAmount) {
+        const balanceText = balanceAmount.textContent;
+        const numericValue = parseFloat(balanceText);
+        if (!isNaN(numericValue)) {
+            balanceAmount.textContent = `${numericValue.toFixed(4)} ${networkInfo.currency}`;
+        }
+    }
+}
 /**
 /**
 * Initialize contract instances
 */
 function initializeContracts(networkId) {
     try {
-        // In a production app, you would select the contract address based on the network ID
+        // Check if we have contract addresses for this network
+        if (!CONTRACT_ADDRESSES[networkId] || !CONTRACT_ADDRESSES[networkId].tokenFactory) {
+            throw new Error(`No contract addresses configured for network ID ${networkId}`);
+        }
+        
+        // Initialize the token factory contract
         tokenFactoryContract = new web3.eth.Contract(
             TokenFactoryABI,
-            CONTRACT_ADDRESSES.tokenFactory
+            CONTRACT_ADDRESSES[networkId].tokenFactory
         );
         
-        console.log('Contracts initialized');
-    } catch (error) {
-        console.error('Error initializing contracts:', error);
-        // Use mock contract for demo mode
-        tokenFactoryContract = createMockContract();
-        console.log('Using mock contract for demo');
-    }
-}
 
 /**
 * Create a mock contract for demo mode

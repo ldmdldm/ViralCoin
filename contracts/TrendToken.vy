@@ -1,3 +1,391 @@
+# @version ^0.3.9
+
+"""
+@title TrendToken
+@author ViralCoin Team
+@notice ERC-20 token with trend-specific features
+@dev Extends standard ERC-20 with trend tracking, lifecycle management, and viral tokenomics
+"""
+
+from vyper.interfaces import ERC20
+
+implements: ERC20
+
+# Events
+event Transfer:
+    sender: indexed(address)
+    receiver: indexed(address)
+    value: uint256
+
+event Approval:
+    owner: indexed(address)
+    spender: indexed(address)
+    value: uint256
+
+event TrendScoreUpdated:
+    old_score: uint256
+    new_score: uint256
+    timestamp: uint256
+
+event TrendLifecycleChanged:
+    old_phase: String[20]
+    new_phase: String[20]
+    timestamp: uint256
+
+event TaxRateChanged:
+    old_rate: uint256
+    new_rate: uint256
+    timestamp: uint256
+
+event TokensBurned:
+    amount: uint256
+    reason: String[50]
+    timestamp: uint256
+
+event TokensMinted:
+    receiver: indexed(address)
+    amount: uint256
+    reason: String[50]
+    timestamp: uint256
+
+event LiquidityAdded:
+    amount_tokens: uint256
+    amount_eth: uint256
+    timestamp: uint256
+
+# Token Data
+name: public(String[64])
+symbol: public(String[32])
+decimals: public(uint8)
+
+# ERC-20 Data
+totalSupply: public(uint256)
+balanceOf: public(HashMap[address, uint256])
+allowance: public(HashMap[address, HashMap[address, uint256]])
+
+# Ownership
+owner: public(address)
+
+# Trend Tracking
+trend_score: public(uint256)  # 0-100, represents viral potential
+trend_category: public(String[32])  # e.g., "meme", "defi", "nft", "ai"
+trend_phase: public(String[20])  # "emerging", "viral", "stable", "declining"
+trend_start_time: public(uint256)
+last_score_update: public(uint256)
+
+# Tokenomics Configuration
+tax_rate: public(uint256)  # basis points (1/100 of 1%)
+burn_rate: public(uint256)  # basis points
+is_mintable: public(bool)
+max_supply: public(uint256)
+
+# Protocol addresses
+liquidity_pool: public(address)
+treasury: public(address)
+
+# Constants
+MAX_TAX_RATE: constant(uint256) = 1000  # 10% max tax in basis points
+MAX_BURN_RATE: constant(uint256) = 2000  # 20% max burn in basis points
+MIN_LIQUIDITY_LOCK_TIME: constant(uint256) = 2592000  # 30 days in seconds
+LIFECYCLE_PERIODS: constant(uint256) = 4  # Number of lifecycle phases
+EMERGING_BONUS: constant(uint256) = 500  # 5% bonus for early holders
+VIRAL_BONUS: constant(uint256) = 300  # 3% bonus for viral phase
+DECLINING_PENALTY: constant(uint256) = 200  # 2% extra tax for declining phase
+
+# Variables
+liquidity_locked_until: public(uint256)
+is_trading_enabled: public(bool)
+initial_holders: public(DynArray[address, 100])
+viral_milestone_reached: public(bool)
+
+@external
+def __init__(
+    _name: String[64],
+    _symbol: String[32],
+    _decimals: uint8,
+    _initial_supply: uint256,
+    _max_supply: uint256,
+    _owner: address,
+    _trend_score: uint256,
+    _trend_category: String[32],
+    _tax_rate: uint256,
+    _burn_rate: uint256,
+    _is_mintable: bool
+):
+    """
+    @notice Initialize the token with trend parameters
+    @param _name Token name
+    @param _symbol Token symbol
+    @param _decimals Number of decimal places
+    @param _initial_supply Initial token supply (in smallest units)
+    @param _max_supply Maximum possible supply
+    @param _owner Address of the token owner
+    @param _trend_score Initial trend score (0-100)
+    @param _trend_category Category of the trend
+    @param _tax_rate Transaction tax rate in basis points
+    @param _burn_rate Burn rate in basis points
+    @param _is_mintable Whether the token can be minted after initial creation
+    """
+    self.name = _name
+    self.symbol = _symbol
+    self.decimals = _decimals
+    self.totalSupply = _initial_supply
+    self.max_supply = _max_supply
+    self.balanceOf[_owner] = _initial_supply
+    self.owner = _owner
+    
+    # Set trend parameters
+    assert _trend_score <= 100, "Trend score must be <= 100"
+    self.trend_score = _trend_score
+    self.trend_category = _trend_category
+    self.trend_phase = "emerging"
+    self.trend_start_time = block.timestamp
+    self.last_score_update = block.timestamp
+    
+    # Set tokenomics parameters
+    assert _tax_rate <= MAX_TAX_RATE, "Tax rate too high"
+    assert _burn_rate <= MAX_BURN_RATE, "Burn rate too high"
+    self.tax_rate = _tax_rate
+    self.burn_rate = _burn_rate
+    self.is_mintable = _is_mintable
+    
+    # Set protocol parameters
+    self.treasury = _owner  # Initially set to owner
+    self.is_trading_enabled = False
+    self.liquidity_locked_until = 0
+    
+    # Emit transfer event for total supply
+    log Transfer(empty(address), _owner, _initial_supply)
+    
+    # Emit trend score set event
+    log TrendScoreUpdated(0, _trend_score, block.timestamp)
+    
+    # Emit lifecycle event
+    log TrendLifecycleChanged("", "emerging", block.timestamp)
+
+@external
+def approve(_spender: address, _value: uint256) -> bool:
+    """
+    @notice Allow _spender to withdraw from your account, multiple times, up to the _value amount
+    @param _spender Address to be approved to spend tokens
+    @param _value Amount of tokens approved to spend
+    @return Success boolean
+    """
+    self.allowance[msg.sender][_spender] = _value
+    log Approval(msg.sender, _spender, _value)
+    return True
+
+@internal
+def _transfer(_from: address, _to: address, _value: uint256) -> uint256:
+    """
+    @dev Internal transfer function with tax and burn mechanisms
+    @param _from Sender address
+    @param _to Receiver address
+    @param _value Amount to transfer (before tax/burn)
+    @return Actual amount received after taxes
+    """
+    assert _to != empty(address), "Cannot transfer to zero address"
+    assert _value <= self.balanceOf[_from], "Insufficient balance"
+    assert self.is_trading_enabled or _from == self.owner or _to == self.owner, "Trading not enabled"
+    
+    # Calculate taxes and burns based on trend phase
+    burn_amount: uint256 = 0
+    tax_amount: uint256 = 0
+    effective_tax_rate: uint256 = self.tax_rate
+    effective_burn_rate: uint256 = self.burn_rate
+    bonus_amount: uint256 = 0
+    
+    if self.trend_phase == "emerging" and (_to not in self.initial_holders):
+        # Early supporters get a bonus
+        bonus_amount = _value * EMERGING_BONUS / 10000
+        self.initial_holders.append(_to)
+    elif self.trend_phase == "viral":
+        # During viral phase, reduce tax to encourage transactions
+        effective_tax_rate = effective_tax_rate * 8 / 10  # 20% tax reduction
+        if self.viral_milestone_reached and (_to not in self.initial_holders):
+            bonus_amount = _value * VIRAL_BONUS / 10000
+    elif self.trend_phase == "declining":
+        # During declining phase, increase tax
+        effective_tax_rate = effective_tax_rate + DECLINING_PENALTY
+    
+    # Calculate tax and burn amounts
+    if _from != self.owner and _to != self.owner:
+        tax_amount = _value * effective_tax_rate / 10000
+        burn_amount = _value * effective_burn_rate / 10000
+    
+    # Calculate net amount
+    net_amount: uint256 = _value - tax_amount - burn_amount + bonus_amount
+    
+    # Update balances
+    self.balanceOf[_from] -= _value
+    self.balanceOf[_to] += net_amount
+    
+    # Handle tax
+    if tax_amount > 0:
+        self.balanceOf[self.treasury] += tax_amount
+        log Transfer(_from, self.treasury, tax_amount)
+    
+    # Handle burn
+    if burn_amount > 0:
+        self.totalSupply -= burn_amount
+        log TokensBurned(burn_amount, "Transaction burn", block.timestamp)
+    
+    # Handle bonus
+    if bonus_amount > 0 and self.is_mintable:
+        # Mint new tokens for the bonus if we're under max supply
+        if self.totalSupply + bonus_amount <= self.max_supply:
+            self.totalSupply += bonus_amount
+            log TokensMinted(_to, bonus_amount, "Trend bonus", block.timestamp)
+    
+    # Emit transfer event
+    log Transfer(_from, _to, net_amount)
+    
+    return net_amount
+
+@external
+def transfer(_to: address, _value: uint256) -> bool:
+    """
+    @notice Transfer tokens to a specified address
+    @param _to The address to transfer to
+    @param _value The amount to be transferred
+    @return Success boolean
+    """
+    self._transfer(msg.sender, _to, _value)
+    return True
+
+@external
+def transferFrom(_from: address, _to: address, _value: uint256) -> bool:
+    """
+    @notice Transfer tokens from one address to another
+    @param _from The address which you want to send tokens from
+    @param _to The address which you want to transfer to
+    @param _value The amount of tokens to be transferred
+    @return Success boolean
+    """
+    assert _value <= self.allowance[_from][msg.sender], "Insufficient allowance"
+    
+    self.allowance[_from][msg.sender] -= _value
+    self._transfer(_from, _to, _value)
+    return True
+
+@external
+def update_trend_score(_new_score: uint256) -> bool:
+    """
+    @notice Update the trend score and potentially change the lifecycle phase
+    @param _new_score New trend score value (0-100)
+    @return Success boolean
+    """
+    assert msg.sender == self.owner, "Only owner can update trend score"
+    assert _new_score <= 100, "Trend score must be <= 100"
+    
+    old_score: uint256 = self.trend_score
+    self.trend_score = _new_score
+    self.last_score_update = block.timestamp
+    
+    # Update trend lifecycle phase based on time and score
+    time_elapsed: uint256 = block.timestamp - self.trend_start_time
+    lifecycle_period: uint256 = (block.timestamp - self.trend_start_time) / (7 * 24 * 60 * 60)  # Weeks since launch
+    old_phase: String[20] = self.trend_phase
+    
+    # Determine lifecycle based on time and score
+    if lifecycle_period < 1:
+        if _new_score >= 80:
+            # Fast-track to viral if score is very high in first week
+            self.trend_phase = "viral"
+            self.viral_milestone_reached = True
+        else:
+            self.trend_phase = "emerging"
+    elif lifecycle_period < 3:
+        if _new_score >= 70:
+            self.trend_phase = "viral"
+            self.viral_milestone_reached = True
+        elif _new_score >= 40:
+            self.trend_phase = "emerging"
+        else:
+            self.trend_phase = "declining"
+    elif lifecycle_period < 8:
+        if _new_score >= 60:
+            self.trend_phase = "viral"
+        elif _new_score >= 30:
+            self.trend_phase = "stable"
+        else:
+            self.trend_phase = "declining"
+    else:
+        if _new_score >= 50:
+            self.trend_phase = "stable"
+        else:
+            self.trend_phase = "declining"
+    
+    # Log events if phase changed
+    if old_phase != self.trend_phase:
+        log TrendLifecycleChanged(old_phase, self.trend_phase, block.timestamp)
+    
+    # Log trend score update
+    log TrendScoreUpdated(old_score, _new_score, block.timestamp)
+    
+    # Adjust tokenomics based on trend phase
+    if self.trend_phase == "viral" and old_phase != "viral":
+        # Lower tax rate during viral phase to encourage transactions
+        old_rate: uint256 = self.tax_rate
+        self.tax_rate = self.tax_rate * 8 / 10  # Reduce tax by 20%
+        log TaxRateChanged(old_rate, self.tax_rate, block.timestamp)
+    elif self.trend_phase == "declining" and old_phase != "declining":
+        # Increase burn rate in declining phase
+        self.burn_rate = min(self.burn_rate * 3 / 2, MAX_BURN_RATE)  # Increase burn by 50% up to max
+    
+    return True
+
+@external
+def enable_trading(_liquidity_pool: address) -> bool:
+    """
+    @notice Enable trading for the token and set the liquidity pool address
+    @param _liquidity_pool Address of the DEX liquidity pool
+    @return Success boolean
+    """
+    assert msg.sender == self.owner, "Only owner can enable trading"
+    assert not self.is_trading_enabled, "Trading already enabled"
+    assert _liquidity_pool != empty(address), "Invalid liquidity pool"
+    
+    self.is_trading_enabled = True
+    self.liquidity_pool = _liquidity_pool
+    self.liquidity_locked_until = block.timestamp + MIN_LIQUIDITY_LOCK_TIME
+    
+    return True
+
+@external
+def add_liquidity() -> bool:
+    """
+    @notice Add liquidity to the DEX pool (must send ETH/MATIC with this call)
+    @return Success boolean
+    """
+    assert msg.sender == self.owner, "Only owner can add liquidity"
+    assert self.liquidity_pool != empty(address), "Liquidity pool not set"
+    assert msg.value > 0, "Must send ETH/MATIC to add liquidity"
+    
+    token_amount: uint256 = self.balanceOf[self.owner] / 10  # 10% of available tokens
+    eth_amount: uint256 = msg.value
+    
+    # Transfer tokens to liquidity pool
+    self._transfer(self.owner, self.liquidity_pool, token_amount)
+    
+    # Send ETH to liquidity pool
+    send(self.liquidity_pool, eth_amount)
+    
+    # Log liquidity addition
+    log LiquidityAdded(token_amount, eth_amount, block.timestamp)
+    
+    return True
+
+@external
+def set_tax_rate(_new_rate: uint256) -> bool:
+    """
+    @notice Set a new tax rate for the token
+    @param _new_rate New tax rate in basis points
+    @return Success boolean
+    """
+    assert msg.sender == self.owner, "Only owner can set tax rate"
+    assert
+
 # @version ^0.3.7
 """
 @title Trend Token Base Contract
