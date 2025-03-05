@@ -247,10 +247,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## Contact
 
-Project Link: [https://github.com/yourusername/ViralCoin](https://github.com/yourusername/ViralCoin)
 
 For questions or support, please open an issue on the GitHub repository or contact the team at viralcoin@example.com.
 
 ---
 
-<p align="center">Made with ❤️ by the ViralCoin Team</p>
+<p align="center">Hope you enjoy it! - the ViralCoin Team</p>
