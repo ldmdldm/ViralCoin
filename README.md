@@ -65,7 +65,7 @@ ViralCoin allows users to invest in cultural phenomena as they emerge.
 - Python 3.8+
 - Node.js 14+
 - OpenAI API key
-- Ethereum/Polygon wallet with testnet tokens for deployment
+- Polygon wallet with testnet tokens for deployment
 - Vyper 0.3.7+
 - Web3.py
 
