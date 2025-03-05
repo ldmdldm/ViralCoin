@@ -2,12 +2,12 @@
 Flask==2.3.3
 Flask-RESTful==0.3.10
 Flask-Cors==4.0.2
-gunicorn==22.0.0
+gunicorn==23.0.0
 Werkzeug==3.0.6
 
 # AI Integration
 openai>=1.6.1,<2.0.0
-langchain==0.1.2
+langchain==0.1.14
 langchain-openai==0.0.2.post1
 tiktoken>=0.5.2,<0.6.0
 
@@ -18,7 +18,7 @@ eth-account==0.8.0
 eth-typing==3.2.0
 
 # Data Processing
-requests==2.31.0
+requests==2.32.2
 
 # Utility
 python-dotenv==1.0.0
