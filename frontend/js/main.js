@@ -197,7 +197,7 @@ if (window.ethereum) {
     console.log('MetaMask detected');
     
     // Handle account changes
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    window.ethereum.on('accountsChanged', (accounts) => handleAccountsChanged(accounts));
     
     // Handle chain changes
     window.ethereum.on('chainChanged', () => window.location.reload());
@@ -337,9 +337,11 @@ async function connectWallet() {
 
     try {
         // Check if ethereum object exists
-        if (!window.ethereum) {
+        if (!window.ethereum && !isDemoMode) {
             throw new Error('No wallet detected. Please install MetaMask or another Web3 wallet.');
         }
+        
+        if (!window.ethereum) enableDemoMode();
 
         // Request account access
         accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
@@ -399,8 +401,12 @@ async function connectWallet() {
         await refreshWalletBalance();
     } catch (error) {
         console.error('Error connecting wallet:', error);
-        updateStatus(`Connection failed: ${error.message}`, 'error');
         isConnected = false;
+        showToast('Failed to connect wallet. Switching to demo mode...', 'warning');
+        
+        // Enable demo mode if wallet connection fails
+        enableDemoMode();
+        localStorage.removeItem('walletConnected');
         localStorage.removeItem('walletConnected');
     } finally {
         showLoading(false);
@@ -650,26 +656,37 @@ async function loadTrendingTopics() {
     
     try {
         // Make a real API call to the backend
-        // Make a real API call to the backend
-        const response = await fetch('/api/trends', {
-            headers: {
-                'X-API-Key': API_KEY
+        let useFallback = false;
+        try {
+            const response = await fetch('/api/trends', {
+                headers: {
+                    'X-API-Key': API_KEY
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`API error: ${response.status} ${response.statusText}`);
             }
-        });
-        if (!response.ok) {
-            throw new Error(`API error: ${response.status} ${response.statusText}`);
+            
+            const data = await response.json();
+            
+            // Check if we received valid data from the API
+            if (data && Array.isArray(data.topics) && data.topics.length > 0) {
+                trendingTopics = data.topics;
+                console.log('Topics loaded from API:', trendingTopics);
+            } else {
+                // If API returned empty data, use fallback
+                console.warn('API returned empty data, using fallback topics');
+                useFallback = true;
+            }
+        } catch (error) {
+            console.error('Error fetching from API:', error);
+            useFallback = true;
         }
         
-        const data = await response.json();
-        
-        // Check if we received valid data from the API
-        if (data && Array.isArray(data.topics) && data.topics.length > 0) {
-            trendingTopics = data.topics;
-            console.log('Topics loaded from API:', trendingTopics);
-        } else {
-            // If API returned empty data, use fallback
-            console.warn('API returned empty data, using fallback topics');
-            throw new Error('No topics received from API');
+        if (useFallback) {
+            // Use fallback data
+            trendingTopics = getSampleTrendingTopics();
+            throw new Error('Using fallback trending topics');
         }
         
         displayTrendingTopics();
@@ -678,29 +695,35 @@ async function loadTrendingTopics() {
         console.error('Error loading trending topics:', error);
         
         // Fallback to sample data if API call fails
-        trendingTopics = [
-            { name: 'Artificial Intelligence in Healthcare', score: 0.98, category: 'Technology', description: 'AI models revolutionizing disease diagnosis and treatment planning' },
-            { name: 'Ethereum Layer 2 Solutions', score: 0.95, category: 'Crypto', description: 'Scaling solutions driving lower fees and higher transaction throughput' },
-            { name: 'Climate Tech Startups', score: 0.93, category: 'Environment', description: 'New companies developing carbon capture and sustainable energy technologies' },
-            { name: 'SpaceX Starship Orbital Test', score: 0.91, category: 'Space', description: 'Latest developments in commercial space exploration' },
-            { name: 'Central Bank Digital Currencies', score: 0.89, category: 'Finance', description: 'Government-backed digital currencies reshaping monetary policy' },
-            { name: 'Metaverse Real Estate Boom', score: 0.87, category: 'Crypto', description: 'Virtual land sales reaching new highs across multiple platforms' },
-            { name: 'Quantum Computing Breakthroughs', score: 0.85, category: 'Technology', description: 'Recent advancements in quantum error correction and qubit stability' },
-            { name: 'NFT Gaming Revolution', score: 0.84, category: 'Entertainment', description: 'Play-to-earn games changing the economics of gaming industry' },
-            { name: 'Global Supply Chain Innovations', score: 0.82, category: 'Business', description: 'New technologies addressing logistics challenges' },
-            { name: 'AR/VR Devices Launch', score: 0.80, category: 'Technology', description: 'Next generation of mixed reality headsets entering the market' },
-            { name: 'Sustainable Finance Movement', score: 0.78, category: 'Finance', description: 'ESG investments reshaping capital allocation globally' },
-            { name: 'Zero-Knowledge Proofs', score: 0.77, category: 'Crypto', description: 'Privacy technology enabling new use cases in blockchain' },
-            { name: 'Remote Work Technologies', score: 0.76, category: 'Business', description: 'Tools and platforms for distributed workforces gaining adoption' },
-            { name: 'Decentralized Science (DeSci)', score: 0.74, category: 'Technology', description: 'Blockchain-based funding and collaboration for scientific research' },
-            { name: 'Neural Interface Developments', score: 0.72, category: 'Technology', description: 'Brain-computer interfaces advancing human-machine interaction' }
-        ];
-        
+        trendingTopics = getSampleTrendingTopics();
         displayTrendingTopics();
-        updateStatus('Using sample trending topics (API unavailable)', 'warning');
+        updateStatus('Using sample trending topics', 'warning');
     } finally {
         showLoading(false);
     }
+}
+
+/**
+* Get sample trending topics for fallback
+*/
+function getSampleTrendingTopics() {
+    return [
+        { name: 'Artificial Intelligence in Healthcare', score: 0.98, category: 'Technology', description: 'AI models revolutionizing disease diagnosis and treatment planning' },
+        { name: 'Ethereum Layer 2 Solutions', score: 0.95, category: 'Crypto', description: 'Scaling solutions driving lower fees and higher transaction throughput' },
+        { name: 'Climate Tech Startups', score: 0.93, category: 'Environment', description: 'New companies developing carbon capture and sustainable energy technologies' },
+        { name: 'SpaceX Starship Orbital Test', score: 0.91, category: 'Space', description: 'Latest developments in commercial space exploration' },
+        { name: 'Central Bank Digital Currencies', score: 0.89, category: 'Finance', description: 'Government-backed digital currencies reshaping monetary policy' },
+        { name: 'Metaverse Real Estate Boom', score: 0.87, category: 'Crypto', description: 'Virtual land sales reaching new highs across multiple platforms' },
+        { name: 'Quantum Computing Breakthroughs', score: 0.85, category: 'Technology', description: 'Recent advancements in quantum error correction and qubit stability' },
+        { name: 'NFT Gaming Revolution', score: 0.84, category: 'Entertainment', description: 'Play-to-earn games changing the economics of gaming industry' },
+        { name: 'Global Supply Chain Innovations', score: 0.82, category: 'Business', description: 'New technologies addressing logistics challenges' },
+        { name: 'AR/VR Devices Launch', score: 0.80, category: 'Technology', description: 'Next generation of mixed reality headsets entering the market' },
+        { name: 'Sustainable Finance Movement', score: 0.78, category: 'Finance', description: 'ESG investments reshaping capital allocation globally' },
+        { name: 'Zero-Knowledge Proofs', score: 0.77, category: 'Crypto', description: 'Privacy technology enabling new use cases in blockchain' },
+        { name: 'Remote Work Technologies', score: 0.76, category: 'Business', description: 'Tools and platforms for distributed workforces gaining adoption' },
+        { name: 'Decentralized Science (DeSci)', score: 0.74, category: 'Technology', description: 'Blockchain-based funding and collaboration for scientific research' },
+        { name: 'Neural Interface Developments', score: 0.72, category: 'Technology', description: 'Brain-computer interfaces advancing human-machine interaction' }
+    ];
 }
 
 /**
@@ -710,6 +733,26 @@ function displayTrendingTopics() {
 if (!trendingTopicsContainer) return;
 
 trendingTopicsContainer.innerHTML = '';
+
+// Check if there are no trending topics to display
+if (!trendingTopics || trendingTopics.length === 0) {
+    // Provide default topics if none are available
+    trendingTopics = [
+        { name: 'Web3 Development', score: 0.95, category: 'Technology', description: 'The future of decentralized internet applications' },
+        { name: 'Cryptocurrency Markets', score: 0.92, category: 'Finance', description: 'Analysis of crypto market trends and opportunities' },
+        { name: 'NFT Collections', score: 0.88, category: 'Art', description: 'Digital collectibles and their impact on the creator economy' }
+    ];
+    
+    // Add a notice that these are placeholder topics
+    const noticeElement = document.createElement('div');
+    noticeElement.className = 'col-12 mb-4';
+    noticeElement.innerHTML = `
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i>Displaying placeholder trending topics. Real-time data could not be loaded.
+        </div>
+    `;
+    trendingTopicsContainer.appendChild(noticeElement);
+}
 
 trendingTopics.forEach(topic => {
     const scorePercentage = Math.round(topic.score * 100);
@@ -981,23 +1024,31 @@ async function handleTokenDeployment(event) {
     }
     
     showLoading(true);
+    showLoading(true);
     updateStatus('Preparing to deploy token...', 'info');
     
-    // Create progress tracking
-    const progressSteps = [
-        { id: 'prep', label: 'Preparing deployment', pct: 10 },
-        { id: 'validation', label: 'Validating parameters', pct: 20 },
-        { id: 'contract', label: 'Initializing contract', pct: 30 },
-        { id: 'gas', label: 'Estimating gas fees', pct: 40 },
-        { id: 'sign', label: 'Awaiting signature', pct: 50 },
-        { id: 'broadcast', label: 'Broadcasting to network', pct: 60 },
-        { id: 'mine', label: 'Waiting for confirmation', pct: 80 },
-        { id: 'complete', label: 'Finalizing deployment', pct: 90 },
-        { id: 'success', label: 'Deployment successful', pct: 100 }
-    ];
-    
-    // Create status message element if it doesn't exist
+    // Show the deployment progress container
     let deploymentProgress = document.getElementById('deploymentProgress');
+    if (deploymentProgress) {
+        deploymentProgress.style.display = 'block';
+    }
+    
+    // Create progress tracking with more detailed steps
+    const progressSteps = [
+        { id: 'prep', label: 'Preparing deployment', pct: 5, icon: 'fa-cog' },
+        { id: 'validation', label: 'Validating parameters', pct: 12, icon: 'fa-check-circle' },
+        { id: 'network', label: 'Checking network compatibility', pct: 18, icon: 'fa-network-wired' },
+        { id: 'contract', label: 'Initializing contract', pct: 25, icon: 'fa-file-contract' },
+        { id: 'gas', label: 'Estimating gas fees', pct: 35, icon: 'fa-gas-pump' },
+        { id: 'sign', label: 'Awaiting signature', pct: 45, icon: 'fa-signature' },
+        { id: 'broadcast', label: 'Broadcasting to network', pct: 60, icon: 'fa-broadcast-tower' },
+        { id: 'mine', label: 'Waiting for confirmation', pct: 75, icon: 'fa-hammer' },
+        { id: 'verify', label: 'Verifying transaction', pct: 85, icon: 'fa-shield-alt' },
+        { id: 'complete', label: 'Finalizing deployment', pct: 95, icon: 'fa-check-double' },
+        { id: 'success', label: 'Deployment successful', pct: 100, icon: 'fa-trophy' }
+    ];
+    // Create status message element if it doesn't exist
+    deploymentProgress = document.getElementById('deploymentProgress');
     if (!deploymentProgress) {
         deploymentProgress = document.createElement('div');
         deploymentProgress.id = 'deploymentProgress';
@@ -1032,6 +1083,9 @@ async function handleTokenDeployment(event) {
     // Function to update progress
     const updateProgress = (stepId, additionalInfo = '') => {
         const step = progressSteps.find(s => s.id === stepId);
+        
+        // Exit if no valid step found
+        if (!step) return;
         if (!step) return;
         
         const progressBar = deploymentProgress.querySelector('.progress-bar');
@@ -1160,6 +1214,20 @@ async function handleTokenDeployment(event) {
             
             // Simulate successful deployment
             updateProgress('complete', `Token created at address: ${tokenAddress}`);
+            
+            // Add explorer link for transactions
+            const networkData = SUPPORTED_NETWORKS[currentChainId] || SUPPORTED_NETWORKS[80001]; // Default to Mumbai
+            const explorerUrl = `${networkData.blockExplorer}/address/${tokenAddress}`;
+            const stepDetails = deploymentProgress.querySelector('.step-details');
+            
+            if (stepDetails) {
+                stepDetails.innerHTML = `
+                    Token created at address: ${tokenAddress}<br>
+                    <a href="${explorerUrl}" target="_blank" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="fas fa-external-link-alt mr-1"></i> View on ${networkData.name} Explorer
+                    </a>
+                `;
+            }
             await new Promise(resolve => setTimeout(resolve, 1000));
         } else {
             // Real token deployment with blockchain interaction
@@ -1201,7 +1269,7 @@ async function handleTokenDeployment(event) {
                             receipt.events.TokenDeployed.returnValues.tokenAddress || 
                             receipt;
                 
-                updateProgress('complete', `Token created at address: ${tokenAddress}`);
+                updateProgress('complete', `Token created at
             } catch (contractError) {
                 console.error('Contract interaction error:', contractError);
                 
